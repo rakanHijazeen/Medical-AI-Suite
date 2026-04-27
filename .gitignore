@@ -1,0 +1,18 @@
+# Environments
+venv/
+.env
+
+# macOS system files
+.DS_Store
+
+# Python / Notebooks
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.vscode/
+
+# Data (Optional: if the datasets are huge, we ignore them, but for this size, it's fine)
+# data/*.csv
+
+# Images/Outputs from EDA
+output*.png
