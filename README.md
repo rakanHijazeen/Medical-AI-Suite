@@ -1,56 +1,97 @@
-Medical AI Suite 🩺
-An Intelligent Health Risk Assessment Platform
+# Medical AI Suite 🩺
 
-📌 Project Overview
-Medical AI Suite is a full-stack web application designed to bridge the gap between machine learning and clinical accessibility. By utilizing advanced classification models, the platform allows users to input health metrics and receive instant, data-driven risk assessments for conditions like Stroke and Cardiovascular diseases.
+An intelligent health risk assessment platform built with Streamlit and machine learning.
 
-The project emphasizes Explainable AI (XAI) by providing confidence scores and visualizing risk factors, moving beyond simple "Yes/No" predictions.
+---
 
-🚀 Key Features
-Predictive Diagnostics: Multi-model support (Random Forest, XGBoost, SVM) for disease risk classification.
+## 📌 Project Overview
 
-Data-Driven Insights: Integrated confidence scoring for every prediction.
+Medical AI Suite is a full-stack health analytics app that combines machine learning with an interactive interface for risk assessment. Users can input clinical features and receive instant, interpretable risk predictions for conditions such as stroke and heart disease.
 
-Dynamic UI: Responsive, clean interface built for both healthcare providers and patient self-assessment.
+Key goals:
 
-Scientific Rigor: Data preprocessing pipeline includes handling class imbalances (SMOTE) and feature scaling for clinical accuracy.
+- Provide fast, data-driven clinical risk estimations
+- Support explainable outputs and confidence scoring
+- Demonstrate end-to-end model deployment with Streamlit
 
-🛠 Tech Stack
-Backend & Frontend: streamlit
+---
 
-Machine Learning: Scikit-learn, XGBoost, SVM, RandomForest, matplotlib, seaborn, SMOTE
+## 🚀 Features
 
-Deployment & Tools: Joblib (used for saving and loading pre-trained weights and scalers).
+- Multi-condition risk prediction
+- Support for multiple ML classifiers
+- Confidence scoring for each prediction
+- Interactive Streamlit-based frontend
+- Data preprocessing with scaling, encoding, and imbalance handling
+- Notebook-based training pipeline for reproducibility
 
-📊 Machine Learning Pipeline
-To ensure the model is reliable for medical data, the following pipeline was implemented:
+---
 
-Data Preprocessing: Handling missing BMI values via median imputation, Cleaning Strings, binary mapping .
+## 🧠 Machine Learning Pipeline
 
-Feature Engineering: One-Hot Encoding for categorical variables like work_type and smoking_status,Label encoding for numerical values, standard scaling.
+The project includes the following ML pipeline steps:
 
-Handling Imbalance: Applied SMOTE (Synthetic Minority Over-sampling Technique) to address the 95:5 class imbalance typical in medical datasets.
+1. Data preprocessing
+   - Median imputation for missing BMI values
+   - Categorical encoding for fields such as `work_type` and `smoking_status`
+   - Feature scaling for clinical variables
 
-Model Selection: Evaluated several classifiers, selecting SVM(for stroke model) with a custom threshold of 0.32 to maximize Recall= 54% (catching potential cases) without overwhelming users with False Positives.
+2. Imbalance handling
+   - SMOTE applied to address class imbalance in medical datasets
 
-Installation & Setup
-1.Clone the repo
-Bash:
+3. Model training and selection
+   - Trials with classifiers such as Random Forest, XGBoost, SVM
+   - Stroke model tuned for recall to prioritize case detection
+
+4. Model serialization
+   - Saved models and transformers using `joblib`
+
+---
+
+## 🛠 Tech Stack
+
+- Frontend / Backend: `Streamlit`
+- Machine learning: `scikit-learn`, `xgboost`, 'SVM', 'RandomForest', `imbalanced-learn`
+- Visualization: `matplotlib`, `seaborn`
+- Model persistence: `joblib`
+
+---
+
+## 📁 Repository Structure
+
+- `app/` – Streamlit application code
+- `data/` – sample datasets used for model development
+- `models/` – saved model artifacts
+- `notebooks/` – Model preprocessing & training and exploration notebooks
+
+---
+
+## ▶️ Installation
+
+```bash
 git clone https://github.com/rakanHijazeen/Medical-AI-Suite.git
 cd Medical-AI-Suite
+pip install -r requirements.txt
+```
 
-    2.Install requirements
-    Bash
-        pip install -r requirements.txt
+## ▶️ Run the App
 
-    3.Launch the app
-    Bash
-        streamlit run app.py
+```bash
+streamlit run app/main.py
+```
 
-🛡 Disclaimer
-This suite is an educational project and should not be used as a substitute for professional medical diagnosis. The models are trained on public datasets and intended to showcase the application of ML in healthcare.
+> If your entrypoint differs, launch the Streamlit app from the actual app file in `app/`.
 
-👤 Author
-Rakan Hijazeen
-GitHub : https://github.com/rakanHijazeen
-LinkedIn : https://www.linkedin.com/in/rakan-hijazeen-327647392/
+---
+
+## 🛡 Disclaimer
+
+This project is for educational purposes only and is not intended to replace professional medical advice or diagnosis.
+
+---
+
+## 👤 Author
+
+- **Rakan Hijazeen**
+- GitHub: https://github.com/rakanHijazeen
+- LinkedIn: https://www.linkedin.com/in/rakan-hijazeen-327647392/
