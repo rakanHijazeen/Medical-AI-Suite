@@ -3,7 +3,170 @@ import joblib
 import numpy as np
 import pandas as pd
 import os
+import shap
+import matplotlib.pyplot as plt
 
+
+def generate_shap_explanation(model, input_df, model_name, output_placeholder=None):
+    """
+    Generate SHAP explanations for medical AI models.
+    
+    Args:
+        model: The trained ML model
+        input_df: DataFrame with features for a single prediction
+        model_name: Name of the model (kidney, heart, diabetes, stroke)
+        output_placeholder: Optional Streamlit container to render explanations
+    
+    Returns:
+        Dictionary with explanation data or None if failed
+    """
+    
+    # Feature name mappings for human-readable display
+    feature_name_map = {
+        "kidney": {
+            "age": "Age", "bp": "Blood Pressure", "sg": "Specific Gravity", 
+            "al": "Albumin", "su": "Sugar", "rbc": "Red Blood Cells",
+            "pc": "Pus Cells", "pcc": "Pus Cell Clumps", "ba": "Bacteria",
+            "bgr": "Blood Glucose Random", "bu": "Blood Urea", "sc": "Serum Creatinine",
+            "sod": "Sodium", "pot": "Potassium", "hemo": "Hemoglobin",
+            "pcv": "Packed Cell Volume", "wc": "White Blood Cells", "rc": "Red Blood Cell Count",
+            "htn": "Hypertension", "dm": "Diabetes Mellitus", "cad": "Coronary Artery Disease",
+            "appet": "Appetite", "pe": "Pedal Edema", "ane": "Anemia"
+        },
+        "heart": {
+            "age": "Age", "trestbps": "Resting Blood Pressure", "chol": "Cholesterol",
+            "thalach": "Max Heart Rate Achieved", "oldpeak": "ST Depression",
+            "sex_1": "Sex (Male)", "cp_1": "Chest Pain Type 1", "cp_2": "Chest Pain Type 2",
+            "cp_3": "Chest Pain Type 3", "fbs_1": "Fasting Blood Sugar > 120",
+            "restecg_1": "Resting ECG 1", "restecg_2": "Resting ECG 2",
+            "exang_1": "Exercise Induced Angina", "slope_1": "Slope of ST 1",
+            "slope_2": "Slope of ST 2", "ca_1": "Coronary Calcification 1",
+            "ca_2": "Coronary Calcification 2", "ca_3": "Coronary Calcification 3",
+            "thal_1": "Thalassemia Type 1", "thal_2": "Thalassemia Type 2",
+            "thal_3": "Thalassemia Type 3", "thal_4": "Thalassemia Type 4"
+        },
+        "diabetes": {
+            "Pregnancies": "Number of Pregnancies", "Glucose": "Glucose Level",
+            "BP": "Blood Pressure", "SkinThickness": "Skin Thickness",
+            "Insulin": "Insulin Level", "BMI": "Body Mass Index",
+            "DPF": "Diabetes Pedigree Function", "Age": "Age"
+        },
+        "stroke": {
+            "gender": "Gender (Male)", "age": "Age", "hypertension": "Hypertension",
+            "heart_disease": "Heart Disease", "ever_married": "Ever Married",
+            "Residence_type": "Residence Type (Urban)", "avg_glucose_level": "Average Glucose Level",
+            "bmi": "Body Mass Index", "work_type_Govt_job": "Government Job",
+            "work_type_Never_worked": "Never Worked", "work_type_Private": "Private Sector",
+            "work_type_Self_employed": "Self-Employed", "work_type_children": "Children",
+            "smoking_status_Unknown": "Smoking Status Unknown", 
+            "smoking_status_formerly_smoked": "Formerly Smoked",
+            "smoking_status_never_smoked": "Never Smoked",
+            "smoking_status_smokes": "Currently Smokes"
+        }
+    }
+    
+    try:
+        # Determine model type and create appropriate explainer
+        model_type = type(model).__name__
+        
+        if "RandomForest" in model_type:
+            # Use TreeExplainer for tree-based models
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(input_df)
+            # For binary classification, take the positive class
+            if isinstance(shap_values, list):
+                shap_values = shap_values[1]
+                
+        elif "XGB" in model_type:
+            # Use TreeExplainer for XGBoost
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(input_df)
+            
+        elif "SVC" in model_type or "SVM" in model_type:
+            # Use KernelExplainer for SVM models (slower but works for any model)
+            # Create background data with a small sample
+            background_data = shap.utils.sample(input_df, min(100, len(input_df)))
+            explainer = shap.KernelExplainer(model.predict, background_data)
+            shap_values = explainer.shap_values(input_df)
+        else:
+            # Fallback for other model types
+            background_data = shap.utils.sample(input_df, min(100, len(input_df)))
+            explainer = shap.KernelExplainer(model.predict, background_data)
+            shap_values = explainer.shap_values(input_df)
+        
+        # Render explanation if container provided
+        if output_placeholder is not None:
+            with output_placeholder:
+                st.write("---")
+                st.write("### 🔍 Why did the AI give this result?")
+                
+                # Normalize SHAP values for a single sample
+                values = np.array(getattr(shap_values, "values", shap_values))
+                # Ensure we get a 1D array for the first sample
+                if values.ndim > 1:
+                    values = values.flatten() if values.shape[0] == 1 else values[0]
+                
+                feature_names = input_df.columns.tolist()
+                # Map feature names to human-readable versions
+                readable_names = []
+                for fname in feature_names:
+                    if model_name in feature_name_map and fname in feature_name_map[model_name]:
+                        readable_names.append(feature_name_map[model_name][fname])
+                    else:
+                        readable_names.append(fname)
+                
+                # Ensure feature names and values match in length
+                if len(values) != len(readable_names):
+                    st.warning(f"Feature count mismatch: {len(readable_names)} features vs {len(values)} SHAP values")
+                    values = values[:len(readable_names)]
+                
+                explained_df = pd.DataFrame({
+                    "feature": readable_names,
+                    "shap_value": values.flatten()
+                })
+                explained_df["abs_shap"] = explained_df["shap_value"].abs()
+                explained_df = explained_df.nlargest(10, "abs_shap").sort_values("abs_shap", ascending=True)
+                
+                tab1, tab2 = st.tabs(["Feature Impact", "Prediction Breakdown"])
+                
+                with tab1:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    colors = ["#d62728" if v > 0 else "#1f77b4" for v in explained_df["shap_value"]]
+                    ax.barh(explained_df["feature"], explained_df["shap_value"], color=colors)
+                    ax.axvline(0, color="black", linewidth=0.8)
+                    ax.set_xlabel("SHAP value")
+                    ax.set_title("Top feature impacts on prediction")
+                    st.pyplot(fig, use_container_width=True)
+                    plt.close(fig)
+                    st.info("📊 **Feature Impact:**\n- Red bars increase risk\n- Blue bars decrease risk")
+                
+                with tab2:
+                    try:
+                        waterfall_values = np.array(getattr(shap_values, "values", shap_values))
+                        if waterfall_values.ndim > 1:
+                            waterfall_values = waterfall_values.flatten() if waterfall_values.shape[0] == 1 else waterfall_values[0]
+                        plt.figure(figsize=(10, 6))
+                        shap.waterfall_plot(shap.Explanation(
+                            values=waterfall_values,
+                            base_values=explainer.expected_value if hasattr(explainer, 'expected_value') else 0,
+                            data=input_df.iloc[0].values,
+                            feature_names=readable_names
+                        ), show=False)
+                        fig = plt.gcf()
+                        st.pyplot(fig, use_container_width=True)
+                        plt.close(fig)
+                    except Exception as exc:
+                        st.warning(f"Waterfall visualization not available for this model type. {exc}")
+        
+        return {
+            "explainer": explainer,
+            "shap_values": shap_values,
+            "model_type": model_type
+        }
+        
+    except Exception as e:
+        st.warning(f"⚠️ Could not generate detailed explanation: {str(e)}")
+        return None
 st.markdown("""
     <style>
     /* Change background color */
@@ -101,38 +264,99 @@ if selection == "Overview":
 # --- KIDNEY DISEASE (24 Features) ---
 elif selection == "Kidney Disease":
     st.title("🧪 Kidney Disease Analysis")
+    
     with st.container(border=True):
-        st.subheader("🩸 Vital Signs")
-        col1, col2 = st.columns(2)
+        st.subheader("🩺 Comprehensive Patient Data")
+        col1, col2, col3 = st.columns(3)
+        
         with col1:
             age = st.number_input("Age", 0, 100, 48)
             bp = st.number_input("Blood Pressure", 50, 180, 80)
             sg = st.selectbox("Specific Gravity", [1.005, 1.010, 1.015, 1.020, 1.025], index=3)
             al = st.slider("Albumin", 0, 5, 1)
+            su = st.slider("Sugar", 0, 5, 0)
+            rbc = st.selectbox("Red Blood Cells", ["Normal", "Abnormal"])
+            pc = st.selectbox("Pus Cell", ["Normal", "Abnormal"])
+            pcc = st.selectbox("Pus Cell Clumps", ["Not Present", "Present"])
+
         with col2:
-            hemo = st.number_input("Hemoglobin", 3.0, 18.0, 15.0)
+            ba = st.selectbox("Bacteria", ["Not Present", "Present"])
+            bgr = st.number_input("Blood Glucose Random", 50.0, 500.0, 121.0)
+            bu = st.number_input("Blood Urea", 5.0, 400.0, 36.0)
+            sc = st.number_input("Serum Creatinine", 0.1, 15.0, 1.2)
+            sod = st.number_input("Sodium", 100.0, 170.0, 137.0)
+            pot = st.number_input("Potassium", 2.0, 50.0, 4.4)
+            hemo = st.number_input("Hemoglobin", 3.0, 18.0, 15.4)
             pcv = st.number_input("Packed Cell Volume", 10, 55, 44)
+
+        with col3:
+            wc = st.number_input("White Blood Cell Count", 2000, 20000, 7800)
+            rc = st.number_input("Red Blood Cell Count", 2.0, 8.0, 5.2)
             htn = st.selectbox("Hypertension", ["No", "Yes"])
             dm = st.selectbox("Diabetes Mellitus", ["No", "Yes"])
+            cad = st.selectbox("Coronary Artery Disease", ["No", "Yes"])
+            appet = st.selectbox("Appetite", ["Good", "Poor"])
+            pe = st.selectbox("Pedal Edema", ["No", "Yes"])
+            ane = st.selectbox("Anemia", ["No", "Yes"])
 
     if st.button("Predict Kidney Health"):
+        # 1. Initialize all 24 features
         features = [0] * 24
-        features[0], features[1], features[2], features[3] = age, bp, sg, al
-        features[14], features[15] = hemo, pcv
+
+        # 2. Map all UI inputs to the features list
+        features[0] = age
+        features[1] = bp
+        features[2] = float(sg)
+        features[3] = al
+        features[4] = su
+        features[5] = 1 if rbc == "Abnormal" else 0
+        features[6] = 1 if pc == "Abnormal" else 0
+        features[7] = 1 if pcc == "Present" else 0
+        features[8] = 1 if ba == "Present" else 0
+        features[9] = bgr
+        features[10] = bu
+        features[11] = sc
+        features[12] = sod
+        features[13] = pot
+        features[14] = hemo
+        features[15] = pcv
+        features[16] = wc
+        features[17] = rc
         features[18] = 1 if htn == "Yes" else 0
         features[19] = 1 if dm == "Yes" else 0
+        features[20] = 1 if cad == "Yes" else 0
+        features[21] = 1 if appet == "Poor" else 0
+        features[22] = 1 if pe == "Yes" else 0
+        features[23] = 1 if ane == "Yes" else 0
         
+        # 3. Get Prediction
         res, prob = predict_risk("kidney", features)
+        
+        # 4. Display Result with Float Conversion Fix
         if res == 1: 
-            # High Risk Case
             st.error(f"Result: CKD Detected (Risk Score: {prob:.2%})")
-            st.progress(prob) # Bar fills up more as risk increases
+            st.progress(float(prob)) 
         else: 
-            # Healthy Case
             st.success(f"Result: Healthy (Confidence: {1-prob:.2%})")
-            # show (1-prob) to show how 'full' their health is:
-            st.progress(1 - prob)
+            st.progress(float(1 - prob))
 
+        # SHAP Explanation for Kidney Disease
+        column_names = ["age", "bp", "sg", "al", "su", "rbc", "pc", "pcc", "ba", "bgr", 
+                        "bu", "sc", "sod", "pot", "hemo", "pcv", "wc", "rc", "htn", 
+                        "dm", "cad", "appet", "pe", "ane"]
+        
+        input_df = pd.DataFrame([features], columns=column_names)
+        
+        # Load model for SHAP explanation
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(base_dir, "..", "models", "kidney_model.pkl")
+        
+        try:
+            kidney_model = joblib.load(model_path)
+            explanation_container = st.container(border=True)
+            generate_shap_explanation(kidney_model, input_df, "kidney", explanation_container)
+        except Exception as e:
+            st.warning(f"Could not load model for explanation: {e}")
 # --- HEART DISEASE (22 Features - drop_first=True) ---
 elif selection == "Heart Disease":
     st.title("❤ Heart Disease Assessment")
@@ -153,7 +377,7 @@ elif selection == "Heart Disease":
 
     if st.button("Predict Heart Health"):
         # Initializing the 22 features required by the model
-        features = [0] * 22
+        features = [0.0] * 22
         
         # The 5 numerical columns (Indices 0-4) - THESE GET SCALED
         features[0] = age
@@ -178,12 +402,30 @@ elif selection == "Heart Disease":
             if res == 1: 
                 # High Risk Case
                 st.error(f"Result: Heart Disease Detected (Risk Score: {prob:.2%})")
-                st.progress(prob) # Bar fills up more as risk increases
+                st.progress(prob)
             else: 
                 # Healthy Case
                 st.success(f"Result: Healthy (Confidence: {1-prob:.2%})")
-                # show (1-prob) to show how 'full' their health is:
                 st.progress(1 - prob)
+            
+            # SHAP Explanation for Heart Disease
+            column_names = ['age', 'trestbps', 'chol', 'thalach', 'oldpeak', 'sex_1', 'cp_1', 
+                           'cp_2', 'cp_3', 'fbs_1', 'restecg_1', 'restecg_2', 'exang_1', 
+                           'slope_1', 'slope_2', 'ca_1', 'ca_2', 'ca_3', 'thal_1', 'thal_2', 
+                           'thal_3', 'thal_4']
+            
+            input_df = pd.DataFrame([features], columns=column_names)
+            
+            # Load model for SHAP explanation
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(base_dir, "..", "models", "heart_model.pkl")
+            
+            try:
+                heart_model = joblib.load(model_path)
+                explanation_container = st.container(border=True)
+                generate_shap_explanation(heart_model, input_df, "heart", explanation_container)
+            except Exception as e:
+                st.warning(f"Could not load model for explanation: {e}")
 
 # --- DIABETES (8 Features) ---
 elif selection == "Diabetes":
@@ -195,12 +437,26 @@ elif selection == "Diabetes":
         if res == 1: 
             # High Risk Case
             st.error(f"Result: Diabetes Detected (Risk Score: {prob:.2%})")
-            st.progress(prob) # Bar fills up more as risk increases
+            st.progress(float(prob))
         else: 
             # Healthy Case
             st.success(f"Result: Healthy (Confidence: {1-prob:.2%})")
-            # show (1-prob) to show how 'full' their health is:
-            st.progress(1 - prob)
+            st.progress(float(1 - prob))
+        
+        # SHAP Explanation for Diabetes
+        column_names = ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]
+        input_df = pd.DataFrame([inputs], columns=column_names)
+        
+        # Load model for SHAP explanation
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(base_dir, "..", "models", "diabetes_model.pkl")
+        
+        try:
+            diabetes_model = joblib.load(model_path)
+            explanation_container = st.container(border=True)
+            generate_shap_explanation(diabetes_model, input_df, "diabetes", explanation_container)
+        except Exception as e:
+            st.warning(f"Could not load model for explanation: {e}")
 
 # --- STROKE (17 Features) ---
 elif selection == "Stroke":
@@ -222,15 +478,15 @@ elif selection == "Stroke":
             smoke = st.selectbox("Smoking Status", ["formerly smoked", "never smoked", "smokes", "Unknown"])
 
     if st.button("Predict Stroke Risk"):
-        features = [0] * 17
+        features = [0.0] * 17
         
         # 1. Basic Features
-        features[0] = 1 if gender == "Male" else 0
+        features[0] = 1.0 if gender == "Male" else 0.0
         features[1] = age
-        features[2] = 1 if hyper == "Yes" else 0
-        features[3] = 1 if heart == "Yes" else 0
-        features[4] = 1 if married == "Yes" else 0
-        features[5] = 1 if residence == "Urban" else 0
+        features[2] = 1.0 if hyper == "Yes" else 0.0
+        features[3] = 1.0 if heart == "Yes" else 0.0
+        features[4] = 1.0 if married == "Yes" else 0.0
+        features[5] = 1.0 if residence == "Urban" else 0.0
         features[6] = avg_glucose
         features[7] = bmi
         
@@ -258,10 +514,30 @@ elif selection == "Stroke":
         # Applying your custom 0.32 threshold from the notebook
         if prob >= 0.32: 
             st.error(f"Result: High Stroke Risk (Prob(threshold=0.32): {prob:.2%})")
-            st.progress(prob) # Bar fills up more as risk increases
+            st.progress(prob)
         else: 
             st.success(f"Result: Low Risk (Confidence:{1-prob:.2%})")
-            st.progress(1 - prob) # Bar fills up more as risk decreases
+            st.progress(1 - prob)
+        
+        # SHAP Explanation for Stroke
+        column_names = ["gender", "age", "hypertension", "heart_disease", "ever_married", 
+                       "Residence_type", "avg_glucose_level", "bmi", "work_type_Govt_job", 
+                       "work_type_Never_worked", "work_type_Private", "work_type_Self_employed", 
+                       "work_type_children", "smoking_status_Unknown", "smoking_status_formerly_smoked", 
+                       "smoking_status_never_smoked", "smoking_status_smokes"]
+        
+        input_df = pd.DataFrame([features], columns=column_names)
+        
+        # Load model for SHAP explanation
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(base_dir, "..", "models", "stroke_model.pkl")
+        
+        try:
+            stroke_model = joblib.load(model_path)
+            explanation_container = st.container(border=True)
+            generate_shap_explanation(stroke_model, input_df, "stroke", explanation_container)
+        except Exception as e:
+            st.warning(f"Could not load model for explanation: {e}")
 
 # --- SIDEBAR FOOTER & RED DISCLAIMER ---
 st.sidebar.markdown("---")
