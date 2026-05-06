@@ -5,7 +5,11 @@ import pandas as pd
 import os
 import shap
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import  StandardScaler
 
+
+stroke_model = joblib.load("../models/stroke_model.pkl")
+heart_model = joblib.load("../models/heart_model.pkl")
 
 def generate_shap_explanation(model, input_df, model_name, output_placeholder=None):
     """
@@ -75,7 +79,7 @@ def generate_shap_explanation(model, input_df, model_name, output_placeholder=No
             # Create background data with a small sample
             background_data = shap.utils.sample(input_df, min(100, len(input_df)))
             explainer = shap.KernelExplainer(model.predict, background_data)
-            shap_values = explainer.shap_values(input_df)
+            shap_values = explainer.shap_values(input_df)   
         else:
             # Fallback for other model types
             background_data = shap.utils.sample(input_df, min(100, len(input_df)))
@@ -155,6 +159,33 @@ def generate_shap_explanation(model, input_df, model_name, output_placeholder=No
     except Exception as e:
         st.warning(f"⚠️ Could not generate detailed explanation: {str(e)}")
         return None
+    
+
+
+def display_feature_impacts(model, feature_names, patient_data_scaled, title="Diagnostic Insights"):
+    """
+    Plots the local impact: (Global Weight * Patient Input).
+    """
+    # 1. Get the learned weights from the model
+    coeffs = model.coef_[0]
+    
+    # 2. CRITICAL: Multiply weights by this specific patient's values
+    # If a feature is 'No' (0), the impact becomes 0 and the bar disappears.
+    local_impact = coeffs * patient_data_scaled.flatten()
+    
+    # 3. Create the plot using the LOCAL impact, not just coeffs
+    feat_importances = pd.Series(local_impact, index=feature_names).sort_values(ascending=True)
+    
+    # Keep the red/green logic
+    colors = ['#2ca02c' if x < 0 else '#d62728' for x in feat_importances.values]
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    feat_importances.plot(kind='barh', ax=ax, color=colors)
+    
+    ax.set_title(title)
+    ax.axvline(x=0, color='black', linewidth=1)
+    st.pyplot(fig)
+
 st.markdown("""
     <style>
     /* Change background color */
@@ -466,7 +497,7 @@ elif selection == "Stroke":
             smoke = st.selectbox("Smoking Status", ["formerly smoked", "never smoked", "smokes", "Unknown"])
 
     if st.button("Predict Stroke Risk"):
-        features = [0.0] * 17
+        features = [0.0] * 18
         
         # 1. Basic Features
         features[0] = 1.0 if gender == "Male" else 0.0
@@ -497,7 +528,21 @@ elif selection == "Stroke":
         }
         features[smoke_map[smoke]] = 1
 
-        res, prob = predict_risk("stroke", features)
+        h_val = 1.0 if hyper == "Yes" else 0.0
+        hd_val = 1.0 if heart == "Yes" else 0.0
+    
+        medical_risk = age * (h_val + hd_val + 1)
+    
+        # Append it to your features list at the end (Index 17)
+        features[17] = medical_risk
+
+        # 2. NOW convert to numpy array so it has the .flatten() method
+        scaler = joblib.load("../models/stroke_scaler.pkl")
+        features_array = np.array(features)
+        features_scaled = scaler.transform(np.array(features).reshape(1, -1))
+
+
+        res, prob = predict_risk("stroke", features_scaled)
         
         # Applying your custom 0.55 threshold from the notebook
         if prob >= 0.55: 
@@ -506,6 +551,16 @@ elif selection == "Stroke":
         else: 
             st.success(f"Result: Low Risk (Confidence:{1-prob:.2%})")
             st.progress(1 - prob)
+
+        # Call the same method!
+        st.subheader("💡 Diagnostic Insights")
+        stroke_features = [
+            "Gender_Male", "Age", "Hypertension", "Heart Disease", 
+            "Ever_Married_Yes", "Residence_type_Urban", "Avg Glucose Level", "BMI",
+            "Work_Govt", "Work_Never", "Work_Private", "Work_Self", "Work_children",
+            "Smoke_Unknown", "Smoke_formerly", "Smoke_never", "Smoke_smokes", "Medical_Risk_Factor"
+        ]
+        display_feature_impacts(stroke_model, stroke_features, features_scaled, "Stroke Risk Factors")
 
 # --- SIDEBAR FOOTER & RED DISCLAIMER ---
 st.sidebar.markdown("---")
