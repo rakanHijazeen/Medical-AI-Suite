@@ -499,9 +499,9 @@ elif selection == "Stroke":
 
         res, prob = predict_risk("stroke", features)
         
-        # Applying your custom 0.32 threshold from the notebook
-        if prob >= 0.32: 
-            st.error(f"Result: High Stroke Risk (Prob(threshold=0.32): {prob:.2%})")
+        # Applying your custom 0.55 threshold from the notebook
+        if prob >= 0.55: 
+            st.error(f"Result: High Stroke Risk (Prob(threshold=0.55): {prob:.2%})")
             st.progress(prob)
         else: 
             st.success(f"Result: Low Risk (Confidence:{1-prob:.2%})")
