@@ -50,18 +50,6 @@ def generate_shap_explanation(model, input_df, model_name, output_placeholder=No
             "BP": "Blood Pressure", "SkinThickness": "Skin Thickness",
             "Insulin": "Insulin Level", "BMI": "Body Mass Index",
             "DPF": "Diabetes Pedigree Function", "Age": "Age"
-        },
-        "stroke": {
-            "gender": "Gender (Male)", "age": "Age", "hypertension": "Hypertension",
-            "heart_disease": "Heart Disease", "ever_married": "Ever Married",
-            "Residence_type": "Residence Type (Urban)", "avg_glucose_level": "Average Glucose Level",
-            "bmi": "Body Mass Index", "work_type_Govt_job": "Government Job",
-            "work_type_Never_worked": "Never Worked", "work_type_Private": "Private Sector",
-            "work_type_Self_employed": "Self-Employed", "work_type_children": "Children",
-            "smoking_status_Unknown": "Smoking Status Unknown", 
-            "smoking_status_formerly_smoked": "Formerly Smoked",
-            "smoking_status_never_smoked": "Never Smoked",
-            "smoking_status_smokes": "Currently Smokes"
         }
     }
     
@@ -518,26 +506,6 @@ elif selection == "Stroke":
         else: 
             st.success(f"Result: Low Risk (Confidence:{1-prob:.2%})")
             st.progress(1 - prob)
-        
-        # SHAP Explanation for Stroke
-        column_names = ["gender", "age", "hypertension", "heart_disease", "ever_married", 
-                       "Residence_type", "avg_glucose_level", "bmi", "work_type_Govt_job", 
-                       "work_type_Never_worked", "work_type_Private", "work_type_Self_employed", 
-                       "work_type_children", "smoking_status_Unknown", "smoking_status_formerly_smoked", 
-                       "smoking_status_never_smoked", "smoking_status_smokes"]
-        
-        input_df = pd.DataFrame([features], columns=column_names)
-        
-        # Load model for SHAP explanation
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.join(base_dir, "..", "models", "stroke_model.pkl")
-        
-        try:
-            stroke_model = joblib.load(model_path)
-            explanation_container = st.container(border=True)
-            generate_shap_explanation(stroke_model, input_df, "stroke", explanation_container)
-        except Exception as e:
-            st.warning(f"Could not load model for explanation: {e}")
 
 # --- SIDEBAR FOOTER & RED DISCLAIMER ---
 st.sidebar.markdown("---")

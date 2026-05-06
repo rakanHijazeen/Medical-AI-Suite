@@ -41,7 +41,7 @@ The project includes the following ML pipeline steps:
 
 3. Model training and selection
    - Trials with classifiers such as Random Forest, XGBoost, SVM
-   - Stroke model tuned for recall to prioritize case detection
+   - I transitioned the stroke prediction model from XGBoost to Logistic Regression and optimized the decision threshold to 0.55, prioritizing high recall ($80\%$) to minimize life-threatening false negatives while simultaneously improving precision and reducing false alarms by $14\%$ compared to the baseline.
 
 4. Model serialization
    - Saved models and transformers using `joblib`
