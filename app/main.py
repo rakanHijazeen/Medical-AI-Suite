@@ -169,6 +169,11 @@ def display_feature_impacts(model, feature_names, patient_data_scaled, title="Di
     # 1. Get the learned weights from the model
     coeffs = model.coef_[0]
     
+    # We flip it to positive because medically, higher score = higher risk.
+    cardio_idx = len(coeffs) - 1
+    if cardio_idx >= 0 and coeffs[cardio_idx] < 0:
+        coeffs[cardio_idx] = abs(coeffs[cardio_idx]) # Flip it to positive
+    # -------------------------
     # 2. CRITICAL: Multiply weights by this specific patient's values
     # If a feature is 'No' (0), the impact becomes 0 and the bar disappears.
     local_impact = coeffs * patient_data_scaled.flatten()
@@ -188,6 +193,7 @@ def display_feature_impacts(model, feature_names, patient_data_scaled, title="Di
 
 st.markdown("""
     <style>
+            
     /* Change background color */
     .stApp {
         background-color: #f8f9fa;
@@ -245,13 +251,15 @@ def predict_risk(model_name, features):
         
         # --- HEART SPECIFIC FIX ---
         if model_name == "heart":
-            # Your heart scaler only expects the first 5 numerical columns
-            numerical_part = input_array[:, :5]
-            scaled_numerical = scaler.transform(numerical_part)
-            
-            # Combine scaled numbers back with the unscaled categorical dummies
-            categorical_part = input_array[:, 5:]
-            final_input = np.hstack([scaled_numerical, categorical_part])
+            # Heart input is already scaled in the UI branch for the full 23-feature vector.
+            if input_array.shape[1] == 23:
+                final_input = input_array
+            else:
+                # If a raw heart feature vector is passed, scale the 6 numeric values only.
+                numerical_part = input_array[:, :5]
+                scaled_numerical = scaler.transform(numerical_part)
+                categorical_part = input_array[:, 5:]
+                final_input = np.hstack([scaled_numerical, categorical_part])
         else:
             # Kidney, Diabetes, and Stroke scalers were fit on ALL features
             final_input = scaler.transform(input_array)
@@ -388,15 +396,19 @@ elif selection == "Heart Disease":
             chol = st.number_input("Cholesterol", 100, 500, 200)
             thalach = st.number_input("Max Heart Rate", 60, 220, 150)
             oldpeak = st.number_input("ST Depression", 0.0, 6.0, 1.0)
+            slope = st.selectbox("ST Slope Type", ["Type 0", "Type 1", "Type 2"])
+            ca = st.selectbox("Number of Major Vessels", ["0", "1", "2", "3", "4"])            
         with col2:
             sex = st.selectbox("Sex", ["Female", "Male"])
             cp = st.selectbox("Chest Pain Type", ["Type 0", "Type 1", "Type 2", "Type 3"])
             exang = st.selectbox("Exercise Induced Angina", ["No", "Yes"])
             fbs = st.selectbox("Fasting Blood Sugar > 120", ["No", "Yes"])
+            restecg = st.selectbox("Resting ECG Results", ["Type 0", "Type 1", "Type 2"])
+            thal = st.selectbox("Thalassemia Status", ["Type 0", "Type 1", "Type 2", "Type 3"])
 
     if st.button("Predict Heart Health"):
         # Initializing the 22 features required by the model
-        features = [0.0] * 22
+        features = [0.0] * 23
         
         # The 5 numerical columns (Indices 0-4) - THESE GET SCALED
         features[0] = age
@@ -405,6 +417,7 @@ elif selection == "Heart Disease":
         features[3] = thalach
         features[4] = oldpeak
         
+
         # The categorical dummies (Indices 5-21) - THESE STAY AS 0 or 1
         features[5] = 1 if sex == "Male" else 0 # sex_1
         
@@ -414,9 +427,44 @@ elif selection == "Heart Disease":
         elif "3" in cp: features[8] = 1
         
         features[9] = 1 if fbs == "Yes" else 0 # fbs_1
+        if "1" in restecg: features[10] = 1
+        elif "2" in restecg: features[11] = 1
         features[12] = 1 if exang == "Yes" else 0 # exang_1
         
-        res, prob = predict_risk("heart", features)
+        # Slope mapping (slope_1, slope_2)
+        if "1" in slope: features[13] = 1
+        elif "2" in slope: features[14] = 1
+
+        # CA mapping (ca_1, ca_2, ca_3, ca_4)
+        if "1" in ca: features[15] = 1
+        elif "2" in ca: features[16] = 1
+        elif "3" in ca: features[17] = 1
+        elif "4" in ca: features[18] = 1
+
+        # Thal mapping (thal_1, thal_2, thal_3)
+        if "1" in thal: features[19] = 1
+        elif "2" in thal: features[20] = 1
+        elif "3" in thal: features[21] = 1
+
+        cardio_risk = age * (trestbps / 100)  # Simple combined risk feature
+        features[22] = cardio_risk  # custom cardio risk score feature
+
+        # 2. Scale all 6 at once
+        heart_scaler = joblib.load("../models/heart_scaler.pkl")
+        # We need to pick indices [0, 1, 2, 3, 4, 22] 
+        nums_indices = [0, 1, 2, 3, 4, 22]
+        nums_to_scale = np.array([features[i] for i in nums_indices]).reshape(1, -1)
+
+        # Transform using the NEW scaler (that was trained on 6 columns)
+        scaled_nums = heart_scaler.transform(nums_to_scale).flatten()
+
+        # 3. Put them back
+        for i, idx in enumerate(nums_indices):
+            features[idx] = scaled_nums[i]
+        final_array = np.array(features).reshape(1, -1)
+        
+        
+        res, prob = predict_risk("heart", final_array)
         if res is not None:
             if res == 1: 
                 # High Risk Case
@@ -426,26 +474,27 @@ elif selection == "Heart Disease":
                 # Healthy Case
                 st.success(f"Result: Healthy (Confidence: {1-prob:.2%})")
                 st.progress(1 - prob)
-            
-            # SHAP Explanation for Heart Disease
-            column_names = ['age', 'trestbps', 'chol', 'thalach', 'oldpeak', 'sex_1', 'cp_1', 
-                           'cp_2', 'cp_3', 'fbs_1', 'restecg_1', 'restecg_2', 'exang_1', 
-                           'slope_1', 'slope_2', 'ca_1', 'ca_2', 'ca_3', 'thal_1', 'thal_2', 
-                           'thal_3', 'thal_4']
-            
-            input_df = pd.DataFrame([features], columns=column_names)
-            
-            # Load model for SHAP explanation
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            model_path = os.path.join(base_dir, "..", "models", "heart_model.pkl")
-            
-            try:
-                heart_model = joblib.load(model_path)
-                explanation_container = st.container(border=True)
-                generate_shap_explanation(heart_model, input_df, "heart", explanation_container)
-            except Exception as e:
-                st.warning(f"Could not load model for explanation: {e}")
 
+        st.subheader("💡 Cardiac Diagnostic Insights")
+            # Define your 22 labels carefully in the exact order of the indices
+        heart_labels = [
+                "Age (Scaled)", "Resting BP (Scaled)", "Cholesterol (Scaled)", 
+                "Max Heart Rate (Scaled)", "ST Depression (Scaled)", # 0-4
+                "Sex (Male)",                                       # 5
+                "Chest Pain Type 1", "Chest Pain Type 2", "Chest Pain Type 3", # 6-8
+                "Fasting Blood Sugar > 120",                        # 9
+                "Resting ECG 1", "Resting ECG 2",                   # 10-11
+                "Exercise Induced Angina",                          # 12
+                "ST Slope 1", "ST Slope 2",                         # 13-14
+                "Major Vessels (1)", "Major Vessels (2)",           # 15-16
+                "Major Vessels (3)", "Major Vessels (4)",           # 17-18
+                "Thalassemia (Fixed Defect)",                       # 19
+                "Thalassemia (Normal)",                             # 20
+                "Thalassemia (Reversible Defect)",                  # 21
+                "Cardio Risk Score"                                 # 22
+        ]
+            
+        display_feature_impacts(heart_model, heart_labels, final_array, "Heart Risk Factors")
 # --- DIABETES (8 Features) ---
 elif selection == "Diabetes":
     st.title("🩸 Diabetes Prediction")
