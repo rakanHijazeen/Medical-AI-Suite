@@ -11,20 +11,22 @@ from sklearn.preprocessing import  StandardScaler
 stroke_model = joblib.load("../models/stroke_model.pkl")
 heart_model = joblib.load("../models/heart_model.pkl")
 
-def generate_shap_explanation(model, input_df, model_name, output_placeholder=None):
+def generate_shap_explanation(model, input_df, model_name, scaler=None, output_placeholder=None):
     """
-    Generate SHAP explanations for medical AI models.
+    Generate SHAP explanations for RandomForest models only.
     
     Args:
         model: The trained ML model
         input_df: DataFrame with features for a single prediction
         model_name: Name of the model (kidney, heart, diabetes, stroke)
+        scaler: Optional scaler used for the model input
         output_placeholder: Optional Streamlit container to render explanations
     
     Returns:
         Dictionary with explanation data or None if failed
     """
-    
+    plt.close("all")
+
     # Feature name mappings for human-readable display
     feature_name_map = {
         "kidney": {
@@ -60,32 +62,22 @@ def generate_shap_explanation(model, input_df, model_name, output_placeholder=No
     try:
         # Determine model type and create appropriate explainer
         model_type = type(model).__name__
-        
-        if "RandomForest" in model_type:
-            # Use TreeExplainer for tree-based models
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(input_df)
-            # For binary classification, take the positive class
-            if isinstance(shap_values, list):
-                shap_values = shap_values[1]
-                
-        elif "XGB" in model_type:
-            # Use TreeExplainer for XGBoost
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(input_df)
-            
-        elif "SVC" in model_type or "SVM" in model_type:
-            # Use KernelExplainer for SVM models (slower but works for any model)
-            # Create background data with a small sample
-            background_data = shap.utils.sample(input_df, min(100, len(input_df)))
-            explainer = shap.KernelExplainer(model.predict, background_data)
-            shap_values = explainer.shap_values(input_df)   
-        else:
-            # Fallback for other model types
-            background_data = shap.utils.sample(input_df, min(100, len(input_df)))
-            explainer = shap.KernelExplainer(model.predict, background_data)
-            shap_values = explainer.shap_values(input_df)
-        
+        if "RandomForest" not in model_type:
+            st.warning("SHAP explanations are currently supported only for RandomForest models.")
+            return None
+
+        if scaler is not None:
+            scaled_array = scaler.transform(input_df.values)
+            input_df = pd.DataFrame(scaled_array, columns=input_df.columns).astype(float)
+
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(input_df, check_additivity=False)
+        if isinstance(shap_values, list):
+            shap_values = shap_values[1]
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            # Handle SHAP versions that return shape (1, n_features, n_classes)
+            shap_values = shap_values[0, :, 1] if shap_values.shape[0] == 1 else shap_values[:, :, 1]
+
         # Render explanation if container provided
         if output_placeholder is not None:
             with output_placeholder:
@@ -94,7 +86,6 @@ def generate_shap_explanation(model, input_df, model_name, output_placeholder=No
                 
                 # Normalize SHAP values for a single sample
                 values = np.array(getattr(shap_values, "values", shap_values))
-                # Ensure we get a 1D array for the first sample
                 if values.ndim > 1:
                     values = values.flatten() if values.shape[0] == 1 else values[0]
                 
@@ -128,7 +119,7 @@ def generate_shap_explanation(model, input_df, model_name, output_placeholder=No
                     ax.axvline(0, color="black", linewidth=0.8)
                     ax.set_xlabel("SHAP value")
                     ax.set_title("Top feature impacts on prediction")
-                    st.pyplot(fig, use_container_width=True)
+                    st.pyplot(fig, clear_figure=True, use_container_width=True)
                     plt.close(fig)
                     st.info("📊 **Feature Impact:**\n- Red bars increase risk\n- Blue bars decrease risk")
                 
@@ -137,15 +128,18 @@ def generate_shap_explanation(model, input_df, model_name, output_placeholder=No
                         waterfall_values = np.array(getattr(shap_values, "values", shap_values))
                         if waterfall_values.ndim > 1:
                             waterfall_values = waterfall_values.flatten() if waterfall_values.shape[0] == 1 else waterfall_values[0]
+                        base_value = explainer.expected_value
+                        if isinstance(base_value, (list, np.ndarray)):
+                            base_value = base_value[1] if len(base_value) > 1 else base_value[0]
                         plt.figure(figsize=(10, 6))
                         shap.waterfall_plot(shap.Explanation(
                             values=waterfall_values,
-                            base_values=explainer.expected_value if hasattr(explainer, 'expected_value') else 0,
+                            base_values=base_value,
                             data=input_df.iloc[0].values,
                             feature_names=readable_names
                         ), show=False)
                         fig = plt.gcf()
-                        st.pyplot(fig, use_container_width=True)
+                        st.pyplot(fig, clear_figure=True, use_container_width=True)
                         plt.close(fig)
                     except Exception as exc:
                         st.warning(f"Waterfall visualization not available for this model type. {exc}")
@@ -377,11 +371,13 @@ elif selection == "Kidney Disease":
         # Load model for SHAP explanation
         base_dir = os.path.dirname(os.path.abspath(__file__))
         model_path = os.path.join(base_dir, "..", "models", "kidney_model.pkl")
+        scaler_path = os.path.join(base_dir, "..", "models", "kidney_scaler.pkl")
         
         try:
             kidney_model = joblib.load(model_path)
-            explanation_container = st.container(border=True)
-            generate_shap_explanation(kidney_model, input_df, "kidney", explanation_container)
+            kidney_scaler = joblib.load(scaler_path)
+            explanation_container = st.empty()
+            generate_shap_explanation(kidney_model, input_df, "kidney", scaler=kidney_scaler, output_placeholder=explanation_container)
         except Exception as e:
             st.warning(f"Could not load model for explanation: {e}")
 # --- HEART DISEASE (22 Features - drop_first=True) ---
@@ -518,11 +514,13 @@ elif selection == "Diabetes":
         # Load model for SHAP explanation
         base_dir = os.path.dirname(os.path.abspath(__file__))
         model_path = os.path.join(base_dir, "..", "models", "diabetes_model.pkl")
+        scaler_path = os.path.join(base_dir, "..", "models", "diabetes_scaler.pkl")
         
         try:
             diabetes_model = joblib.load(model_path)
-            explanation_container = st.container(border=True)
-            generate_shap_explanation(diabetes_model, input_df, "diabetes", explanation_container)
+            diabetes_scaler = joblib.load(scaler_path)
+            explanation_container = st.empty()
+            generate_shap_explanation(diabetes_model, input_df, "diabetes", scaler=diabetes_scaler, output_placeholder=explanation_container)
         except Exception as e:
             st.warning(f"Could not load model for explanation: {e}")
 
