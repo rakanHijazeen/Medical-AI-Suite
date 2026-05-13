@@ -636,7 +636,7 @@ elif selection == "Heart Disease":
             
             report_bytes = create_report(
                 patient_name, 
-                heart_labels, 
+                "Heart Disease", 
                 result_text_heart, 
                 f"{prob*100:.2f}",
                 patient_features=features, 
@@ -675,14 +675,9 @@ elif selection == "Diabetes":
             diabetes_feature_names = ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]
             feature_ranges_diabetes = {name: REFERENCE_RANGES["diabetes"][name] for name in diabetes_feature_names}
             
-            report_bytes = create_report(patient_name, "Diabetes", result_text, f"{prob*100:.2f}",
-                                        patient_features=inputs, feature_names=diabetes_feature_names,
-                                        feature_ranges=feature_ranges_diabetes)
-            st.download_button("Download Diabetes PDF Report", data=report_bytes, file_name="diabetes_report.pdf", mime="application/pdf")
         
         # SHAP Explanation for Diabetes - captures feature impacts for PDF
-        column_names = ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]
-        input_df = pd.DataFrame([inputs], columns=column_names)
+        input_df = pd.DataFrame([inputs], columns=diabetes_feature_names)
         
         # Load model for SHAP explanation
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -697,12 +692,25 @@ elif selection == "Diabetes":
             
             # If we got feature impacts from SHAP, regenerate PDF with them
             if shap_result and "feature_impacts" in shap_result and prob is not None:
-                diabetes_feature_names = ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]
-                feature_ranges_diabetes = {name: REFERENCE_RANGES["diabetes"][name] for name in diabetes_feature_names}
-                report_bytes = create_report(patient_name, "Diabetes", result_text, f"{prob*100:.2f}",
-                                            patient_features=inputs, feature_names=diabetes_feature_names,
-                                            feature_ranges=feature_ranges_diabetes, feature_impacts=shap_result["feature_impacts"])
-                st.download_button("Download Diabetes PDF Report", data=report_bytes, file_name="diabetes_report.pdf", mime="application/pdf")
+                report_bytes = create_report(patient_name, 
+                                             "Diabetes Disease", 
+                                             result_text, 
+                                             f"{prob*100:.2f}",
+                                            patient_features=inputs, 
+                                            feature_names=diabetes_feature_names,
+                                            feature_ranges=feature_ranges_diabetes, 
+                                            feature_impacts=shap_result["feature_impacts"],
+                                            pos_factors=shap_result["pos_factors"], # Top 3 Drivers
+                                            neg_factors=shap_result["neg_factors"]  # Top 3 Protective
+                                        )
+                st.download_button(
+                    label="📥 Download Clinical Summary Report", 
+                    data=report_bytes, 
+                    file_name=f"Diabetes_Report_{patient_name}.pdf", 
+                    mime="application/pdf",
+                    help="Download a detailed PDF report of the analysis, including key risk factors and explanations.",
+                    type="primary"
+                )
         except Exception as e:
             st.warning(f"Could not load model for explanation: {e}")
 
@@ -783,24 +791,8 @@ elif selection == "Stroke":
             result_text = f"Low Risk (Confidence:{1-prob:.2%})"
             st.success(f"Result: {result_text}")
             st.progress(1 - prob)
-        if prob is not None:
-            stroke_feature_names = [
-                "Gender (Male)", "Age", "Hypertension", "Heart Disease",
-                "Ever Married", "Urban Residence", "Avg Glucose Level", "BMI",
-                "Work: Govt", "Work: Never", "Work: Private", "Work: Self-employed", "Work: Children",
-                "Smoke: Unknown", "Smoke: Formerly", "Smoke: Never", "Smoke: Current", "Medical Risk"
-            ]
-            feature_ranges_stroke = {stroke_feature_names[i]: REFERENCE_RANGES["stroke"].get(
-                ["Gender_Male", "Age", "Hypertension", "Heart Disease", "Ever_Married_Yes", "Residence_type_Urban",
-                 "Avg Glucose Level", "BMI", "Work_Govt", "Work_Never", "Work_Private", "Work_Self", "Work_children",
-                 "Smoke_Unknown", "Smoke_formerly", "Smoke_never", "Smoke_smokes", "Medical_Risk_Factor"][i], "N/A")
-                for i in range(len(stroke_feature_names))}
             
-            report_bytes = create_report(patient_name, "Stroke", result_text, f"{prob*100:.2f}",
-                                        patient_features=features, feature_names=stroke_feature_names,
-                                        feature_ranges=feature_ranges_stroke)
-            st.download_button("Download Stroke PDF Report", data=report_bytes, file_name="stroke_report.pdf", mime="application/pdf")
-
+            
         st.subheader("💡 Diagnostic Insights")
         stroke_features = [
             "Gender_Male", "Age", "Hypertension", "Heart Disease", 
@@ -825,10 +817,26 @@ elif selection == "Stroke":
                  "Smoke_Unknown", "Smoke_formerly", "Smoke_never", "Smoke_smokes", "Medical_Risk_Factor"][i], "N/A")
                 for i in range(len(stroke_feature_names))}
             
-            report_bytes = create_report(patient_name, "Stroke", result_text, f"{prob*100:.2f}",
-                                        patient_features=features, feature_names=stroke_feature_names,
-                                        feature_ranges=feature_ranges_stroke, feature_impacts=feature_impacts_stroke)
-            st.download_button("Download Stroke PDF Report (Updated)", data=report_bytes, file_name="stroke_report.pdf", mime="application/pdf")
+            report_bytes = create_report(
+                patient_name, 
+                "Stroke Disease", 
+                result_text, 
+                f"{prob*100:.2f}",     
+                patient_features=features, 
+                feature_names=stroke_feature_names,
+                feature_ranges=feature_ranges_stroke, 
+                pos_factors=feature_impacts_stroke["pos_factors"], 
+                neg_factors=feature_impacts_stroke["neg_factors"]
+            )
+
+            st.download_button(
+                label="📥 Download Clinical Summary Report",
+                data=report_bytes, 
+                file_name=f"stroke_Report{patient_name}.pdf", 
+                mime="application/pdf",
+                help="Download a detailed PDF report of the analysis, including key risk factors and explanations.",
+                type="primary" 
+            )
 
 # --- SIDEBAR FOOTER & RED DISCLAIMER ---
 st.sidebar.markdown("---")
