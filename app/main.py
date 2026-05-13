@@ -4,8 +4,40 @@ import numpy as np
 import pandas as pd
 import os
 import shap
+import io
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import  StandardScaler
+from pdf_report import create_report
+
+# Reference ranges for each disease's features
+REFERENCE_RANGES = {
+    "kidney": {
+        "age": "18-80 years", "bp": "90-120 mmHg", "sg": "1.010-1.020", "al": "0-2", "su": "0",
+        "rbc": "Normal", "pc": "Normal", "pcc": "Not Present", "ba": "Not Present", "bgr": "70-100 mg/dL",
+        "bu": "7-20 mg/dL", "sc": "0.7-1.3 mg/dL", "sod": "136-145 mEq/L", "pot": "3.5-5.0 mEq/L",
+        "hemo": "12-16 g/dL", "pcv": "36-46%", "wc": "4500-11000 /µL", "rc": "4.5-5.9 M/µL",
+        "htn": "No", "dm": "No", "cad": "No", "appet": "Good", "pe": "No", "ane": "No"
+    },
+    "heart": {
+        "age": "25-75 years", "trestbps": "90-120 mmHg", "chol": "<200 mg/dL", "thalach": "60-100 bpm",
+        "oldpeak": "0.0", "sex_1": "N/A", "cp_1": "No", "cp_2": "No", "cp_3": "No",
+        "fbs_1": "No", "restecg_1": "No", "restecg_2": "No", "exang_1": "No",
+        "slope_1": "No", "slope_2": "No", "ca_1": "0", "ca_2": "0", "ca_3": "0", "ca_4": "0",
+        "thal_1": "No", "thal_2": "No", "thal_3": "No", "thal_4": "No"
+    },
+    "diabetes": {
+        "Pregnancies": "0-5", "Glucose": "70-100 mg/dL", "BP": "90-120 mmHg",
+        "SkinThickness": "20-30 mm", "Insulin": "12-166 µIU/mL", "BMI": "18.5-24.9",
+        "DPF": "0.1-0.8", "Age": "21-80 years"
+    },
+    "stroke": {
+        "Gender_Male": "N/A", "Age": "18-80 years", "Hypertension": "No", "Heart Disease": "No",
+        "Ever_Married_Yes": "N/A", "Residence_type_Urban": "N/A", "Avg Glucose Level": "70-100 mg/dL",
+        "BMI": "18.5-24.9", "Work_Govt": "N/A", "Work_Never": "N/A", "Work_Private": "N/A",
+        "Work_Self": "N/A", "Work_children": "N/A", "Smoke_Unknown": "N/A", "Smoke_formerly": "N/A",
+        "Smoke_never": "N/A", "Smoke_smokes": "N/A", "Medical_Risk_Factor": "Low"
+    }
+}
 
 
 stroke_model = joblib.load("../models/stroke_model.pkl")
@@ -103,6 +135,9 @@ def generate_shap_explanation(model, input_df, model_name, scaler=None, output_p
                     st.warning(f"Feature count mismatch: {len(readable_names)} features vs {len(values)} SHAP values")
                     values = values[:len(readable_names)]
                 
+                # Create feature impacts dictionary for PDF
+                feature_impacts_dict = {readable_names[i]: float(values[i]) for i in range(len(readable_names))}
+                
                 explained_df = pd.DataFrame({
                     "feature": readable_names,
                     "shap_value": values.flatten()
@@ -120,7 +155,6 @@ def generate_shap_explanation(model, input_df, model_name, scaler=None, output_p
                     ax.set_xlabel("SHAP value")
                     ax.set_title("Top feature impacts on prediction")
                     st.pyplot(fig, clear_figure=True, use_container_width=True)
-                    plt.close(fig)
                     st.info("📊 **Feature Impact:**\n- Red bars increase risk\n- Blue bars decrease risk")
                 
                 with tab2:
@@ -140,14 +174,45 @@ def generate_shap_explanation(model, input_df, model_name, scaler=None, output_p
                         ), show=False)
                         fig = plt.gcf()
                         st.pyplot(fig, clear_figure=True, use_container_width=True)
-                        plt.close(fig)
                     except Exception as exc:
                         st.warning(f"Waterfall visualization not available for this model type. {exc}")
         
+        # Extract feature impacts before rendering
+        values = np.array(getattr(shap_values, "values", shap_values))
+        if values.ndim > 1:
+            values = values.flatten() if values.shape[0] == 1 else values[0]
+        
+        feature_names = input_df.columns.tolist()
+        readable_names = []
+        for fname in feature_names:
+            if model_name in feature_name_map and fname in feature_name_map[model_name]:
+                readable_names.append(feature_name_map[model_name][fname])
+            else:
+                readable_names.append(fname)
+        
+        if len(values) != len(readable_names):
+            values = values[:len(readable_names)]
+        
+        feature_impacts_dict = {readable_names[i]: float(values[i]) for i in range(len(readable_names))}
+        
+        # 1. Sort features by their SHAP values to find top drivers
+        sorted_features = sorted(feature_impacts_dict.items(), key=lambda x: x[1], reverse=True)
+        
+        # 2. Get top 3 increasing risk (Positive) and top 3 decreasing risk (Negative)
+        pos_factors = [f"{k} (+{v:.2f})" for k, v in sorted_features if v > 0][:3]
+        neg_factors = [f"{k} ({v:.2f})" for k, v in sorted_features if v < 0][-3:]
+        
+        # 3. Capture the current Bar Chart figure
+        # 'fig' is already defined in your 'tab1' block
+
         return {
             "explainer": explainer,
             "shap_values": shap_values,
-            "model_type": model_type
+            "feature_impacts": feature_impacts_dict,
+            "model_type": model_type,
+            "fig": fig,             
+            "pos_factors": pos_factors, 
+            "neg_factors": neg_factors  
         }
         
     except Exception as e:
@@ -181,9 +246,17 @@ def display_feature_impacts(model, feature_names, patient_data_scaled, title="Di
     fig, ax = plt.subplots(figsize=(10, 6))
     feat_importances.plot(kind='barh', ax=ax, color=colors)
     
+    # Create a 'Virtual File' in RAM
+    img_buf = io.BytesIO()
+    fig.savefig(img_buf, format='png', bbox_inches='tight')
+    img_buf.seek(0) # Reset the 'virtual pen' to the start of the file
+    
     ax.set_title(title)
     ax.axvline(x=0, color='black', linewidth=1)
     st.pyplot(fig)
+    
+    # Return the feature impacts dictionary
+    return {feature_names[i]: float(local_impact[i]) for i in range(len(feature_names))}
 
 st.markdown("""
     <style>
@@ -285,6 +358,7 @@ if selection == "Overview":
 # --- KIDNEY DISEASE (24 Features) ---
 elif selection == "Kidney Disease":
     st.title("🧪 Kidney Disease Analysis")
+    patient_name = st.text_input("Patient Name", "Anonymous")
     
     with st.container(border=True):
         st.subheader("🩺 Comprehensive Patient Data")
@@ -355,13 +429,32 @@ elif selection == "Kidney Disease":
         
         # 4. Display Result with Float Conversion Fix
         if res == 1: 
-            st.error(f"Result: CKD Detected (Risk Score: {prob:.2%})")
+            result_text = f"CKD Detected (Risk Score: {prob:.2%})"
+            st.error(f"Result: {result_text}")
             st.progress(float(prob)) 
         else: 
-            st.success(f"Result: Healthy (Confidence: {1-prob:.2%})")
+            result_text = f"Healthy (Confidence: {1-prob:.2%})"
+            st.success(f"Result: {result_text}")
             st.progress(float(1 - prob))
 
-        # SHAP Explanation for Kidney Disease
+        if prob is not None:
+            column_names = ["age", "bp", "sg", "al", "su", "rbc", "pc", "pcc", "ba", "bgr", 
+                            "bu", "sc", "sod", "pot", "hemo", "pcv", "wc", "rc", "htn", 
+                            "dm", "cad", "appet", "pe", "ane"]
+            readable_names = [
+                "Age", "BP", "Specific Gravity", "Albumin", "Sugar", "RBC", "Pus Cells", "Pus Cell Clumps",
+                "Bacteria", "Blood Glucose", "Blood Urea", "Serum Creatinine", "Sodium", "Potassium",
+                "Hemoglobin", "Packed Cell Volume", "WBC", "RCC", "Hypertension", "Diabetes Mellitus",
+                "Coronary Artery Disease", "Appetite", "Pedal Edema", "Anemia"
+            ]
+            feature_ranges = {readable_names[i]: REFERENCE_RANGES["kidney"][column_names[i]] 
+                             for i in range(len(readable_names))}
+            
+            report_bytes = create_report(patient_name, "Kidney Disease", result_text, f"{prob*100:.2f}",
+                                        patient_features=features, feature_names=readable_names,
+                                        feature_ranges=feature_ranges)
+           
+        # SHAP Explanation for Kidney Disease - captures feature impacts for PDF
         column_names = ["age", "bp", "sg", "al", "su", "rbc", "pc", "pcc", "ba", "bgr", 
                         "bu", "sc", "sod", "pot", "hemo", "pcv", "wc", "rc", "htn", 
                         "dm", "cad", "appet", "pe", "ane"]
@@ -377,12 +470,40 @@ elif selection == "Kidney Disease":
             kidney_model = joblib.load(model_path)
             kidney_scaler = joblib.load(scaler_path)
             explanation_container = st.empty()
-            generate_shap_explanation(kidney_model, input_df, "kidney", scaler=kidney_scaler, output_placeholder=explanation_container)
+            shap_result = generate_shap_explanation(kidney_model, input_df, "kidney", scaler=kidney_scaler, output_placeholder=explanation_container)
+            
+            # Textual insights for PDF report based on SHAP results
+            if shap_result and prob is not None:
+                # 1. Regenerate the PDF using only textual insights
+                report_bytes = create_report(
+                    patient_name, 
+                    "Kidney Disease", 
+                    result_text, 
+                    f"{prob*100:.2f}",
+                    patient_features=features, 
+                    feature_names=readable_names,
+                    feature_ranges=feature_ranges, 
+                    feature_impacts=shap_result["feature_impacts"],
+                    pos_factors=shap_result["pos_factors"], # Top 3 Drivers
+                    neg_factors=shap_result["neg_factors"]  # Top 3 Protective
+                    # Note: shap_img_buf is removed here
+                )
+                
+                # 2. Provide the download link
+                st.download_button(
+                    label="📥 Download Clinical Summary Report",
+                    data=report_bytes,
+                    file_name=f"Kidney_Report_{patient_name}.pdf",
+                    mime="application/pdf",
+                    help="Download a detailed PDF report of the analysis, including key risk factors and explanations.",
+                    type="primary"
+                )
         except Exception as e:
             st.warning(f"Could not load model for explanation: {e}")
 # --- HEART DISEASE (22 Features - drop_first=True) ---
 elif selection == "Heart Disease":
     st.title("❤ Heart Disease Assessment")
+    patient_name = st.text_input("Patient Name", "Anonymous")
     with st.container(border=True):
         st.subheader("🩸 Vital Signs")
         col1, col2 = st.columns(2)
@@ -463,51 +584,101 @@ elif selection == "Heart Disease":
         res, prob = predict_risk("heart", final_array)
         if res is not None:
             if res == 1: 
-                # High Risk Case
-                st.error(f"Result: Heart Disease Detected (Risk Score: {prob:.2%})")
+                result_text = f"Heart Disease Detected (Risk Score: {prob:.2%})"
+                st.error(f"Result: {result_text}")
                 st.progress(prob)
             else: 
-                # Healthy Case
-                st.success(f"Result: Healthy (Confidence: {1-prob:.2%})")
+                result_text = f"Healthy (Confidence: {1-prob:.2%})"
+                st.success(f"Result: {result_text}")
                 st.progress(1 - prob)
 
+            if prob is not None:
+                heart_readable_names = [
+                    "Age", "Resting BP", "Cholesterol", "Max Heart Rate", "ST Depression",
+                    "Sex (Male)", "Chest Pain 1", "Chest Pain 2", "Chest Pain 3",
+                    "Fasting Blood Sugar", "Resting ECG 1", "Resting ECG 2", "Exercise Induced Angina",
+                    "ST Slope 1", "ST Slope 2", "Major Vessels 1", "Major Vessels 2",
+                    "Major Vessels 3", "Major Vessels 4", "Thalassemia 1", "Thalassemia 2",
+                    "Thalassemia 3", "Cardio Risk Score"
+                ]
+                feature_ranges_heart = {heart_readable_names[i]: REFERENCE_RANGES["heart"].get(
+                    ["age", "trestbps", "chol", "thalach", "oldpeak", "sex_1", "cp_1", "cp_2", "cp_3",
+                     "fbs_1", "restecg_1", "restecg_2", "exang_1", "slope_1", "slope_2", "ca_1", "ca_2",
+                     "ca_3", "ca_4", "thal_1", "thal_2", "thal_3", "cardio_risk"][i], "N/A") 
+                    for i in range(len(heart_readable_names))}
+                
+                report_bytes = create_report(patient_name, "Heart Disease", result_text, f"{prob*100:.2f}",
+                                            patient_features=features, feature_names=heart_readable_names,
+                                            feature_ranges=feature_ranges_heart)
+                st.download_button("Download Heart PDF Report", data=report_bytes, file_name="heart_report.pdf", mime="application/pdf")
+
         st.subheader("💡 Cardiac Diagnostic Insights")
-            # Define your 22 labels carefully in the exact order of the indices
         heart_labels = [
                 "Age (Scaled)", "Resting BP (Scaled)", "Cholesterol (Scaled)", 
-                "Max Heart Rate (Scaled)", "ST Depression (Scaled)", # 0-4
-                "Sex (Male)",                                       # 5
-                "Chest Pain Type 1", "Chest Pain Type 2", "Chest Pain Type 3", # 6-8
-                "Fasting Blood Sugar > 120",                        # 9
-                "Resting ECG 1", "Resting ECG 2",                   # 10-11
-                "Exercise Induced Angina",                          # 12
-                "ST Slope 1", "ST Slope 2",                         # 13-14
-                "Major Vessels (1)", "Major Vessels (2)",           # 15-16
-                "Major Vessels (3)", "Major Vessels (4)",           # 17-18
-                "Thalassemia (Fixed Defect)",                       # 19
-                "Thalassemia (Normal)",                             # 20
-                "Thalassemia (Reversible Defect)",                  # 21
-                "Cardio Risk Score"                                 # 22
+                "Max Heart Rate (Scaled)", "ST Depression (Scaled)",
+                "Sex (Male)",
+                "Chest Pain Type 1", "Chest Pain Type 2", "Chest Pain Type 3",
+                "Fasting Blood Sugar > 120",
+                "Resting ECG 1", "Resting ECG 2",
+                "Exercise Induced Angina",
+                "ST Slope 1", "ST Slope 2",
+                "Major Vessels (1)", "Major Vessels (2)",
+                "Major Vessels (3)", "Major Vessels (4)",
+                "Thalassemia (Fixed Defect)",
+                "Thalassemia (Normal)",
+                "Thalassemia (Reversible Defect)",
+                "Cardio Risk Score"
         ]
+        
+        feature_impacts_heart = display_feature_impacts(heart_model, heart_labels, final_array, "Heart Risk Factors")
+        
+        # Regenerate PDF with feature impacts
+        if prob is not None and feature_impacts_heart:
+            heart_readable_names = [
+                "Age", "Resting BP", "Cholesterol", "Max Heart Rate", "ST Depression",
+                "Sex (Male)", "Chest Pain 1", "Chest Pain 2", "Chest Pain 3",
+                "Fasting Blood Sugar", "Resting ECG 1", "Resting ECG 2", "Exercise Induced Angina",
+                "ST Slope 1", "ST Slope 2", "Major Vessels 1", "Major Vessels 2",
+                "Major Vessels 3", "Major Vessels 4", "Thalassemia 1", "Thalassemia 2",
+                "Thalassemia 3", "Cardio Risk Score"
+            ]
+            feature_ranges_heart = {heart_readable_names[i]: REFERENCE_RANGES["heart"].get(
+                ["age", "trestbps", "chol", "thalach", "oldpeak", "sex_1", "cp_1", "cp_2", "cp_3",
+                 "fbs_1", "restecg_1", "restecg_2", "exang_1", "slope_1", "slope_2", "ca_1", "ca_2",
+                 "ca_3", "ca_4", "thal_1", "thal_2", "thal_3", "cardio_risk"][i], "N/A") 
+                for i in range(len(heart_readable_names))}
             
-        display_feature_impacts(heart_model, heart_labels, final_array, "Heart Risk Factors")
+            result_text_heart = f"Heart Disease Detected (Risk Score: {prob:.2%})" if res == 1 else f"Healthy (Confidence: {1-prob:.2%})"
+            report_bytes = create_report(patient_name, "Heart Disease", result_text_heart, f"{prob*100:.2f}",
+                                        patient_features=features, feature_names=heart_readable_names,
+                                        feature_ranges=feature_ranges_heart, feature_impacts=feature_impacts_heart)
+            st.download_button("Download Heart PDF Report (Updated)", data=report_bytes, file_name="heart_report.pdf", mime="application/pdf")
 # --- DIABETES (8 Features) ---
 elif selection == "Diabetes":
     st.title("🩸 Diabetes Prediction")
+    patient_name = st.text_input("Patient Name", "Anonymous")
     inputs = [st.number_input(l, 0.0) for l in ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]]
     
     if st.button("Predict Diabetes"):
         res, prob = predict_risk("diabetes", inputs)
         if res == 1: 
-            # High Risk Case
-            st.error(f"Result: Diabetes Detected (Risk Score: {prob:.2%})")
+            result_text = f"Diabetes Detected (Risk Score: {prob:.2%})"
+            st.error(f"Result: {result_text}")
             st.progress(float(prob))
         else: 
-            # Healthy Case
-            st.success(f"Result: Healthy (Confidence: {1-prob:.2%})")
+            result_text = f"Healthy (Confidence: {1-prob:.2%})"
+            st.success(f"Result: {result_text}")
             st.progress(float(1 - prob))
+        if prob is not None:
+            diabetes_feature_names = ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]
+            feature_ranges_diabetes = {name: REFERENCE_RANGES["diabetes"][name] for name in diabetes_feature_names}
+            
+            report_bytes = create_report(patient_name, "Diabetes", result_text, f"{prob*100:.2f}",
+                                        patient_features=inputs, feature_names=diabetes_feature_names,
+                                        feature_ranges=feature_ranges_diabetes)
+            st.download_button("Download Diabetes PDF Report", data=report_bytes, file_name="diabetes_report.pdf", mime="application/pdf")
         
-        # SHAP Explanation for Diabetes
+        # SHAP Explanation for Diabetes - captures feature impacts for PDF
         column_names = ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]
         input_df = pd.DataFrame([inputs], columns=column_names)
         
@@ -520,13 +691,23 @@ elif selection == "Diabetes":
             diabetes_model = joblib.load(model_path)
             diabetes_scaler = joblib.load(scaler_path)
             explanation_container = st.empty()
-            generate_shap_explanation(diabetes_model, input_df, "diabetes", scaler=diabetes_scaler, output_placeholder=explanation_container)
+            shap_result = generate_shap_explanation(diabetes_model, input_df, "diabetes", scaler=diabetes_scaler, output_placeholder=explanation_container)
+            
+            # If we got feature impacts from SHAP, regenerate PDF with them
+            if shap_result and "feature_impacts" in shap_result and prob is not None:
+                diabetes_feature_names = ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]
+                feature_ranges_diabetes = {name: REFERENCE_RANGES["diabetes"][name] for name in diabetes_feature_names}
+                report_bytes = create_report(patient_name, "Diabetes", result_text, f"{prob*100:.2f}",
+                                            patient_features=inputs, feature_names=diabetes_feature_names,
+                                            feature_ranges=feature_ranges_diabetes, feature_impacts=shap_result["feature_impacts"])
+                st.download_button("Download Diabetes PDF Report", data=report_bytes, file_name="diabetes_report.pdf", mime="application/pdf")
         except Exception as e:
             st.warning(f"Could not load model for explanation: {e}")
 
 # --- STROKE (17 Features) ---
 elif selection == "Stroke":
     st.title("🧠 Stroke Risk Analysis")
+    patient_name = st.text_input("Patient Name", "Anonymous")
     with st.container(border=True):
         st.subheader("🩸 Vital Signs")
         col1, col2 = st.columns(2)
@@ -593,13 +774,31 @@ elif selection == "Stroke":
         
         # Applying your custom 0.55 threshold from the notebook
         if prob >= 0.55: 
-            st.error(f"Result: High Stroke Risk (Prob(threshold=0.55): {prob:.2%})")
+            result_text = f"High Stroke Risk (Prob(threshold=0.55): {prob:.2%})"
+            st.error(f"Result: {result_text}")
             st.progress(prob)
         else: 
-            st.success(f"Result: Low Risk (Confidence:{1-prob:.2%})")
+            result_text = f"Low Risk (Confidence:{1-prob:.2%})"
+            st.success(f"Result: {result_text}")
             st.progress(1 - prob)
+        if prob is not None:
+            stroke_feature_names = [
+                "Gender (Male)", "Age", "Hypertension", "Heart Disease",
+                "Ever Married", "Urban Residence", "Avg Glucose Level", "BMI",
+                "Work: Govt", "Work: Never", "Work: Private", "Work: Self-employed", "Work: Children",
+                "Smoke: Unknown", "Smoke: Formerly", "Smoke: Never", "Smoke: Current", "Medical Risk"
+            ]
+            feature_ranges_stroke = {stroke_feature_names[i]: REFERENCE_RANGES["stroke"].get(
+                ["Gender_Male", "Age", "Hypertension", "Heart Disease", "Ever_Married_Yes", "Residence_type_Urban",
+                 "Avg Glucose Level", "BMI", "Work_Govt", "Work_Never", "Work_Private", "Work_Self", "Work_children",
+                 "Smoke_Unknown", "Smoke_formerly", "Smoke_never", "Smoke_smokes", "Medical_Risk_Factor"][i], "N/A")
+                for i in range(len(stroke_feature_names))}
+            
+            report_bytes = create_report(patient_name, "Stroke", result_text, f"{prob*100:.2f}",
+                                        patient_features=features, feature_names=stroke_feature_names,
+                                        feature_ranges=feature_ranges_stroke)
+            st.download_button("Download Stroke PDF Report", data=report_bytes, file_name="stroke_report.pdf", mime="application/pdf")
 
-        # Call the same method!
         st.subheader("💡 Diagnostic Insights")
         stroke_features = [
             "Gender_Male", "Age", "Hypertension", "Heart Disease", 
@@ -607,7 +806,27 @@ elif selection == "Stroke":
             "Work_Govt", "Work_Never", "Work_Private", "Work_Self", "Work_children",
             "Smoke_Unknown", "Smoke_formerly", "Smoke_never", "Smoke_smokes", "Medical_Risk_Factor"
         ]
-        display_feature_impacts(stroke_model, stroke_features, features_scaled, "Stroke Risk Factors")
+        
+        feature_impacts_stroke = display_feature_impacts(stroke_model, stroke_features, features_scaled, "Stroke Risk Factors")
+        
+        # Regenerate PDF with feature impacts
+        if prob is not None and feature_impacts_stroke:
+            stroke_feature_names = [
+                "Gender (Male)", "Age", "Hypertension", "Heart Disease",
+                "Ever Married", "Urban Residence", "Avg Glucose Level", "BMI",
+                "Work: Govt", "Work: Never", "Work: Private", "Work: Self-employed", "Work: Children",
+                "Smoke: Unknown", "Smoke: Formerly", "Smoke: Never", "Smoke: Current", "Medical Risk"
+            ]
+            feature_ranges_stroke = {stroke_feature_names[i]: REFERENCE_RANGES["stroke"].get(
+                ["Gender_Male", "Age", "Hypertension", "Heart Disease", "Ever_Married_Yes", "Residence_type_Urban",
+                 "Avg Glucose Level", "BMI", "Work_Govt", "Work_Never", "Work_Private", "Work_Self", "Work_children",
+                 "Smoke_Unknown", "Smoke_formerly", "Smoke_never", "Smoke_smokes", "Medical_Risk_Factor"][i], "N/A")
+                for i in range(len(stroke_feature_names))}
+            
+            report_bytes = create_report(patient_name, "Stroke", result_text, f"{prob*100:.2f}",
+                                        patient_features=features, feature_names=stroke_feature_names,
+                                        feature_ranges=feature_ranges_stroke, feature_impacts=feature_impacts_stroke)
+            st.download_button("Download Stroke PDF Report (Updated)", data=report_bytes, file_name="stroke_report.pdf", mime="application/pdf")
 
 # --- SIDEBAR FOOTER & RED DISCLAIMER ---
 st.sidebar.markdown("---")
