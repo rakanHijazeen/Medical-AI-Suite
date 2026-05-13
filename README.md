@@ -14,7 +14,6 @@ An intelligent health risk assessment platform built with Streamlit and machine 
 - [Repository Structure](#-repository-structure)
 - [Installation](#️-installation)
 - [Usage](#️-usage)
-- [Contributing](#-contributing)
 - [Disclaimer](#-disclaimer)
 - [Author](#-author)
 
@@ -67,39 +66,44 @@ The project includes the following ML pipeline steps:
 
 ## 🚀 Challenges & Technical Hurdles
 
-1. Model Logic Inversion & Scaling Mismatch
-   Problem: Initial testing of the Heart Disease model yielded "100% Healthy" predictions even for high-risk inputs (e.g., 80-year-old with high BP). This was traced to a mismatch between the training vector (23 features) and the application input (5 features).
+### 1. 🚨 Model Logic Inversion & Scaling Mismatch
 
-Action: Re-engineered the data pipeline to synchronize the StandardScaler with a new 6-feature numerical set (including a custom interaction term) and aligned the one-hot encoded categorical indices.
+**Problem:** Initial testing of the Heart Disease model yielded "100% Healthy" predictions even for high-risk inputs (e.g., 80-year-old with high BP). This was traced to a mismatch between the training vector (23 features) and the application input (5 features).
 
-Result: Restored model sensitivity, achieving a realistic 97% risk probability for critical cases.
+**🔧 Action:** Re-engineered the data pipeline to synchronize the StandardScaler with a new 6-feature numerical set (including a custom interaction term) and aligned the one-hot encoded categorical indices.
 
-2. Overfitting & "Perfect" Metric Bias (Kidney Model)
-   Problem: The Chronic Kidney Disease (CKD) model achieved 100% accuracy/recall, indicating structural overfitting on highly correlated biomarkers like Hemoglobin and PCV.
+**✅ Result:** Restored model sensitivity, achieving a realistic 97% risk probability for critical cases.
 
-Action: Implemented Gaussian Noise Injection to simulate clinical measurement variance and applied Structural Regularization by capping the Random Forest max_depth and increasing min_samples_leaf.
+### 2. 🚨 Overfitting & "Perfect" Metric Bias (Kidney Model)
 
-Result: Traded artificial precision for clinical reliability, bringing metrics to a robust and generalizable 90-95%.
+**Problem:** The Chronic Kidney Disease (CKD) model achieved 100% accuracy/recall, indicating structural overfitting on highly correlated biomarkers like Hemoglobin and PCV.
 
-3. Stroke Diagnostic Model
-   Problem: Initial model (XGBoost) produced too many false negatives (high risk) and excessive "false alarms" (clinical noise), undermining user trust.
+**🔧 Action:** Implemented Gaussian Noise Injection to simulate clinical measurement variance and applied Structural Regularization by capping the Random Forest max_depth and increasing min_samples_leaf.
 
-Action: Swapped XGBoost for Logistic Regression to improve interpretability and tuned the decision threshold to 0.55 to prioritize high-risk detection.
+**✅ Result:** Traded artificial precision for clinical reliability, bringing metrics to a robust and generalizable 90-95%.
 
-Result: Secured 80% Recall (minimizing missed cases) while slashing false alarms by 14% through improved precision.
+### 3. 🚨 Stroke Diagnostic Model Optimization
 
-4. Explainable AI (XAI) Synchronization
-   Problem: Standard feature importance plots were static and did not reflect the specific reasoning for individual patient predictions. Furthermore, SHAP explainer states were "freezing" in the Streamlit UI.
+**Problem:** Initial model (XGBoost) produced too many false negatives (high risk) and excessive "false alarms" (clinical noise), undermining user trust.
 
-Action: Developed a unified interpretability layer using SHAP (Shapley Additive Explanations) for non-linear models and coefficient-mapping for linear models. Fixed Matplotlib state issues using global figure clearing to ensure real-time visual updates.
+**🔧 Action:** Swapped XGBoost for Logistic Regression to improve interpretability and tuned the decision threshold to 0.55 to prioritize high-risk detection.
 
-Result: A fully transparent diagnostic suite where every prediction is accompanied by a mathematically sound "local" explanation.
+**✅ Result:** Secured 80% Recall (minimizing missed cases) while slashing false alarms by 14% through improved precision.
+
+### 4. 🚨 Explainable AI (XAI) Synchronization
+
+**Problem:** Standard feature importance plots were static and did not reflect the specific reasoning for individual patient predictions. Furthermore, SHAP explainer states were "freezing" in the Streamlit UI.
+
+**🔧 Action:** Developed a unified interpretability layer using SHAP (Shapley Additive Explanations) for non-linear models and coefficient-mapping for linear models. Fixed Matplotlib state issues using global figure clearing to ensure real-time visual updates.
+
+**✅ Result:** A fully transparent diagnostic suite where every prediction is accompanied by a mathematically sound "local" explanation.
 
 ## 🛠 Tech Stack
 
 - Frontend / Backend: `Streamlit`
 - Machine learning: `scikit-learn`, `xgboost`, `SVM`, `RandomForest`, `imbalanced-learn`
 - Visualization: `matplotlib`, `seaborn`
+- PDF Generation: `fpdf2`
 - Model persistence: `joblib`
 
 ---
