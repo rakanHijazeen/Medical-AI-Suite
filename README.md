@@ -1,3 +1,5 @@
+![Medical AI Suite Demo](assets/demo.gif)
+
 # Medical AI Suite 🩺
 
 An intelligent health risk assessment platform built with Streamlit and machine learning.
