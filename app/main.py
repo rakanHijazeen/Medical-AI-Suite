@@ -155,6 +155,7 @@ def generate_shap_explanation(model, input_df, model_name, scaler=None, output_p
                     ax.set_xlabel("SHAP value")
                     ax.set_title("Top feature impacts on prediction")
                     st.pyplot(fig, clear_figure=True, use_container_width=True)
+                    plt.close(fig)
                     st.info("📊 **Feature Impact:**\n- Red bars increase risk\n- Blue bars decrease risk")
                 
                 with tab2:
@@ -174,6 +175,7 @@ def generate_shap_explanation(model, input_df, model_name, scaler=None, output_p
                         ), show=False)
                         fig = plt.gcf()
                         st.pyplot(fig, clear_figure=True, use_container_width=True)
+                        plt.close(fig)
                     except Exception as exc:
                         st.warning(f"Waterfall visualization not available for this model type. {exc}")
         
@@ -236,6 +238,16 @@ def display_feature_impacts(model, feature_names, patient_data_scaled, title="Di
     # 2. CRITICAL: Multiply weights by this specific patient's values
     # If a feature is 'No' (0), the impact becomes 0 and the bar disappears.
     local_impact = coeffs * patient_data_scaled.flatten()
+
+    # 3. Prepare data for PDF (Drivers vs. Protective)
+    impact_dict = {feature_names[i]: float(local_impact[i]) for i in range(len(feature_names))}
+    
+    # Sort by impact value: Positive (Risk) at top, Negative (Protective) at bottom
+    sorted_features = sorted(impact_dict.items(), key=lambda x: x[1], reverse=True)
+    
+    # Extract textual drivers
+    pos_factors = [f"{k} (+{v:.2f})" for k, v in sorted_features if v > 0][:3]
+    neg_factors = [f"{k} ({v:.2f})" for k, v in sorted_features if v < 0][-3:]
     
     # 3. Create the plot using the LOCAL impact, not just coeffs
     feat_importances = pd.Series(local_impact, index=feature_names).sort_values(ascending=True)
@@ -245,19 +257,16 @@ def display_feature_impacts(model, feature_names, patient_data_scaled, title="Di
     
     fig, ax = plt.subplots(figsize=(10, 6))
     feat_importances.plot(kind='barh', ax=ax, color=colors)
-    
-    # Create a 'Virtual File' in RAM
-    img_buf = io.BytesIO()
-    fig.savefig(img_buf, format='png', bbox_inches='tight')
-    img_buf.seek(0) # Reset the 'virtual pen' to the start of the file
-    
     ax.set_title(title)
     ax.axvline(x=0, color='black', linewidth=1)
     st.pyplot(fig)
     
-    # Return the feature impacts dictionary
-    return {feature_names[i]: float(local_impact[i]) for i in range(len(feature_names))}
-
+    # 5. RETURN standardized dictionary
+    return {
+        "feature_impacts": impact_dict,
+        "pos_factors": pos_factors,
+        "neg_factors": neg_factors
+    }
 st.markdown("""
     <style>
             
@@ -450,15 +459,7 @@ elif selection == "Kidney Disease":
             feature_ranges = {readable_names[i]: REFERENCE_RANGES["kidney"][column_names[i]] 
                              for i in range(len(readable_names))}
             
-            report_bytes = create_report(patient_name, "Kidney Disease", result_text, f"{prob*100:.2f}",
-                                        patient_features=features, feature_names=readable_names,
-                                        feature_ranges=feature_ranges)
-           
         # SHAP Explanation for Kidney Disease - captures feature impacts for PDF
-        column_names = ["age", "bp", "sg", "al", "su", "rbc", "pc", "pcc", "ba", "bgr", 
-                        "bu", "sc", "sod", "pot", "hemo", "pcv", "wc", "rc", "htn", 
-                        "dm", "cad", "appet", "pe", "ane"]
-        
         input_df = pd.DataFrame([features], columns=column_names)
         
         # Load model for SHAP explanation
@@ -566,6 +567,8 @@ elif selection == "Heart Disease":
         cardio_risk = age * (trestbps / 100)  # Simple combined risk feature
         features[22] = cardio_risk  # custom cardio risk score feature
 
+        # This keeps 'features' raw for the PDF report
+        features_for_model = list(features)
         # 2. Scale all 6 at once
         heart_scaler = joblib.load("../models/heart_scaler.pkl")
         # We need to pick indices [0, 1, 2, 3, 4, 22] 
@@ -577,8 +580,8 @@ elif selection == "Heart Disease":
 
         # 3. Put them back
         for i, idx in enumerate(nums_indices):
-            features[idx] = scaled_nums[i]
-        final_array = np.array(features).reshape(1, -1)
+            features_for_model[idx] = scaled_nums[i]
+        final_array = np.array(features_for_model).reshape(1, -1)
         
         
         res, prob = predict_risk("heart", final_array)
@@ -592,25 +595,6 @@ elif selection == "Heart Disease":
                 st.success(f"Result: {result_text}")
                 st.progress(1 - prob)
 
-            if prob is not None:
-                heart_readable_names = [
-                    "Age", "Resting BP", "Cholesterol", "Max Heart Rate", "ST Depression",
-                    "Sex (Male)", "Chest Pain 1", "Chest Pain 2", "Chest Pain 3",
-                    "Fasting Blood Sugar", "Resting ECG 1", "Resting ECG 2", "Exercise Induced Angina",
-                    "ST Slope 1", "ST Slope 2", "Major Vessels 1", "Major Vessels 2",
-                    "Major Vessels 3", "Major Vessels 4", "Thalassemia 1", "Thalassemia 2",
-                    "Thalassemia 3", "Cardio Risk Score"
-                ]
-                feature_ranges_heart = {heart_readable_names[i]: REFERENCE_RANGES["heart"].get(
-                    ["age", "trestbps", "chol", "thalach", "oldpeak", "sex_1", "cp_1", "cp_2", "cp_3",
-                     "fbs_1", "restecg_1", "restecg_2", "exang_1", "slope_1", "slope_2", "ca_1", "ca_2",
-                     "ca_3", "ca_4", "thal_1", "thal_2", "thal_3", "cardio_risk"][i], "N/A") 
-                    for i in range(len(heart_readable_names))}
-                
-                report_bytes = create_report(patient_name, "Heart Disease", result_text, f"{prob*100:.2f}",
-                                            patient_features=features, feature_names=heart_readable_names,
-                                            feature_ranges=feature_ranges_heart)
-                st.download_button("Download Heart PDF Report", data=report_bytes, file_name="heart_report.pdf", mime="application/pdf")
 
         st.subheader("💡 Cardiac Diagnostic Insights")
         heart_labels = [
@@ -649,10 +633,28 @@ elif selection == "Heart Disease":
                 for i in range(len(heart_readable_names))}
             
             result_text_heart = f"Heart Disease Detected (Risk Score: {prob:.2%})" if res == 1 else f"Healthy (Confidence: {1-prob:.2%})"
-            report_bytes = create_report(patient_name, "Heart Disease", result_text_heart, f"{prob*100:.2f}",
-                                        patient_features=features, feature_names=heart_readable_names,
-                                        feature_ranges=feature_ranges_heart, feature_impacts=feature_impacts_heart)
-            st.download_button("Download Heart PDF Report (Updated)", data=report_bytes, file_name="heart_report.pdf", mime="application/pdf")
+            
+            report_bytes = create_report(
+                patient_name, 
+                heart_labels, 
+                result_text_heart, 
+                f"{prob*100:.2f}",
+                patient_features=features, 
+                feature_names=heart_readable_names,
+                feature_ranges=feature_ranges_heart,
+                # Standardized inputs
+                pos_factors=feature_impacts_heart["pos_factors"], 
+                neg_factors=feature_impacts_heart["neg_factors"]
+            )
+                    
+            st.download_button(
+                label="📥 Download Clinical Summary Report",
+                data=report_bytes,
+                file_name=f"Heart_Report_{patient_name}.pdf",
+                mime="application/pdf",
+                help="Download a detailed PDF report of the analysis, including key risk factors and explanations.",
+                type="primary" 
+            )
 # --- DIABETES (8 Features) ---
 elif selection == "Diabetes":
     st.title("🩸 Diabetes Prediction")
