@@ -366,7 +366,7 @@ if selection == "Overview":
 
 # --- KIDNEY DISEASE (24 Features) ---
 elif selection == "Kidney Disease":
-    st.title("🧪 Kidney Disease Analysis")
+    st.title("🧪 Kidney Disease Prediction")
     patient_name = st.text_input("Patient Name", "Anonymous")
     
     with st.container(border=True):
@@ -503,7 +503,7 @@ elif selection == "Kidney Disease":
             st.warning(f"Could not load model for explanation: {e}")
 # --- HEART DISEASE (22 Features - drop_first=True) ---
 elif selection == "Heart Disease":
-    st.title("❤ Heart Disease Assessment")
+    st.title("❤ Heart Disease Prediction")
     patient_name = st.text_input("Patient Name", "Anonymous")
     with st.container(border=True):
         st.subheader("🩸 Vital Signs")
@@ -716,7 +716,7 @@ elif selection == "Diabetes":
 
 # --- STROKE (17 Features) ---
 elif selection == "Stroke":
-    st.title("🧠 Stroke Risk Analysis")
+    st.title("🧠 Stroke Risk Prediction")
     patient_name = st.text_input("Patient Name", "Anonymous")
     with st.container(border=True):
         st.subheader("🩸 Vital Signs")
@@ -784,11 +784,11 @@ elif selection == "Stroke":
         
         # Applying your custom 0.55 threshold from the notebook
         if prob >= 0.55: 
-            result_text = f"High Stroke Risk (Prob(threshold=0.55): {prob:.2%})"
+            result_text = f"High Stroke Risk(Risk Score: {prob:.2%})"
             st.error(f"Result: {result_text}")
             st.progress(prob)
         else: 
-            result_text = f"Low Risk (Confidence:{1-prob:.2%})"
+            result_text = f"Low Risk (Confidence: {1-prob:.2%})"
             st.success(f"Result: {result_text}")
             st.progress(1 - prob)
             
