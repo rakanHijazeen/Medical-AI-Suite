@@ -39,7 +39,7 @@ class MedicalRAGEngine:
 
         # 4. Fire the structured request to Groq's cloud servers
         try:
-            response = self.client.chat.completions.create(
+            gen_response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -48,9 +48,49 @@ class MedicalRAGEngine:
                 temperature=0.2, # Low temperature forces the model to stay factual
                 max_tokens=1024
             )
-            return response.choices[0].message.content
+            initial_explanation = gen_response.choices[0].message.content
+            # =====================================================================
+            # STAGE 2: THE GUARD / AUDITOR LLM
+            # =====================================================================
+            print("🛡️ [RAG GUARD] Passing generation to Auditor LLM for medical compliance verification...")
+            
+            guard_system_prompt = (
+                "You are a strict Medical AI Auditor and Medical Fact-Checker. Your sole job is to cross-examine "
+                "a generated clinical explanation against the raw source Medical Reference Guidelines.\n\n"
+                "CRITICAL RULES:\n"
+                "1. If the explanation contains ANY facts, medications, or clinical benchmarks NOT explicitly mentioned "
+                "in the source guidelines, you must flag it and strip out the hallucination.\n"
+                "2. Ensure the tone is objective and completely safe for clinical decision support.\n"
+                "3. Output a finalized, audited version of the text. Do not include conversational remarks like 'I have audited this'."
+            )
+
+            guard_user_prompt = f"""
+### RAW SOURCE MEDICAL GUIDELINES (THE TRUTH)
+{formatted_context}
+
+### GENERATED CLINICAL EXPLANATION TO AUDIT
+{initial_explanation}
+
+---
+Review the explanation carefully. Output the finalized, verified explanation below. If changes or deletions are necessary for absolute accuracy to the truth data, apply them directly.
+"""
+
+            # 2. Fire the audit verification request
+            audit_response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": guard_system_prompt},
+                    {"role": "user", "content": guard_user_prompt}
+                ],
+                temperature=0.1, # Extremely low temperature for strict adherence to text
+                max_tokens=1024
+            )
+            
+            final_audited_report = audit_response.choices[0].message.content
+            return final_audited_report
+
         except Exception as e:
-            return f"❌ Error generating response: {str(e)}"
+            return f"❌ Error running dual-LLM pipeline: {str(e)}"
 
 # Simulating main app context
 if __name__ == "__main__":
