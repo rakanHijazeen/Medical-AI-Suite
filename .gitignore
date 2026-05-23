@@ -1,6 +1,6 @@
 # Environments
 venv/
-.env/
+.env
 ENV/
 
 # macOS system files
@@ -14,7 +14,7 @@ __pycache__/
 
 # Data (Optional: if the datasets are huge, we ignore them, but for this size, it's fine)
 # data/*.csv
-data/medical_reference/
+data/git add ./
 
 # Images/Outputs from EDA
 output*.png
