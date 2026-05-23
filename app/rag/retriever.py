@@ -1,5 +1,9 @@
 import psycopg2
 from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv 
+
+# Load environment variables from the root .env file
+load_dotenv()
 
 import os
 # Force sentence-transformers to use local weights instead of pinging the web
@@ -15,11 +19,11 @@ class MedicalRAGRetriever:
     def _connect_db(self):
         """Internal helper to access the isolated port 5433 Docker instance."""
         return psycopg2.connect(
-            host="localhost",
-            database="medical_ai",
-            user="postgres",
-            password="mysecretpassword",
-            port="5433"
+            host=os.getenv("DB_HOST"),
+            database=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            port=os.getenv("DB_PORT")
         )
 
     def retrieve_context(self, disease_category: str, query_text: str, top_k: int = 3) -> list:

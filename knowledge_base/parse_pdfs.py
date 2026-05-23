@@ -3,6 +3,9 @@ import psycopg2
 from pypdf import PdfReader
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
+
+load_dotenv()
 
 print("⏳ Loading local embedding engine (all-MiniLM-L6-v2)...")
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -10,11 +13,11 @@ print("✅ Embedding engine loaded successfully!")
 
 def connect_db():
     return psycopg2.connect(
-        host="localhost",
-        database="medical_ai",
-        user="postgres",
-        password="mysecretpassword",
-        port="5433"
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        port=os.getenv("DB_PORT")
     )
 
 def create_overlapping_chunks(text: str, category: str, page_num: int, window_size=500, overlap=150) -> list:
