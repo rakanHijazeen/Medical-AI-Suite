@@ -1,8 +1,12 @@
 import os 
+from dotenv import load_dotenv
 import psycopg2 # Added to handle DB connection check
 from groq import Groq 
 from utils.logger import logger  # 👈 System text log stream
 from utils.audit_logger import log_evaluation  # 👈 Postgres evaluation logger
+
+load_dotenv()
+groq_key = os.getenv("GROQ_API_KEY")
 
 class MedicalRAGEngine:
     def __init__(self, api_key: str = None):

@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+# Finds 'Medical_AI_Suite' directory dynamically (one level up from app/main.py)
+ROOT_DIR = str(Path(__file__).resolve().parents[1])
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
 import streamlit as st
 import joblib
 import numpy as np
@@ -7,6 +15,7 @@ import shap
 import io
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import  StandardScaler
+from app.rag import generate_medical_audit
 from pdf_report import create_report
 
 # Reference ranges for each disease's features
@@ -40,8 +49,8 @@ REFERENCE_RANGES = {
 }
 
 
-stroke_model = joblib.load("../models/stroke_model.pkl")
-heart_model = joblib.load("../models/heart_model.pkl")
+stroke_model = joblib.load(Path(ROOT_DIR) / "models" / "stroke_model.pkl")
+heart_model = joblib.load(Path(ROOT_DIR) / "models" / "heart_model.pkl")
 
 def generate_shap_explanation(model, input_df, model_name, scaler=None, output_placeholder=None):
     """
@@ -221,6 +230,29 @@ def generate_shap_explanation(model, input_df, model_name, scaler=None, output_p
         st.warning(f"⚠️ Could not generate detailed explanation: {str(e)}")
         return None
     
+
+
+def display_rag_report(disease, risk_score, patient_metrics):
+    """Generate and display RAG-audited clinical guidance."""
+    if not patient_metrics or risk_score is None:
+        return None
+
+    with st.expander("🔎 Generate Clinical Audit (RAG)"):
+        try:
+            st.info("Generating audited clinical guidance from the medical knowledge base.")
+            audited_report = generate_medical_audit(
+                disease=disease,
+                risk_score=float(risk_score),
+                patient_metrics=patient_metrics
+            )
+            if audited_report:
+                st.markdown("### 📝 RAG-Audited Clinical Summary")
+                st.write(audited_report)
+                return audited_report
+            st.warning("RAG generated no summary.")
+        except Exception as exc:
+            st.error(f"RAG audit failed: {exc}")
+    return None
 
 
 def display_feature_impacts(model, feature_names, patient_data_scaled, title="Diagnostic Insights"):
@@ -446,6 +478,7 @@ elif selection == "Kidney Disease":
             st.success(f"Result: {result_text}")
             st.progress(float(1 - prob))
 
+        audited_report = None
         if prob is not None:
             column_names = ["age", "bp", "sg", "al", "su", "rbc", "pc", "pcc", "ba", "bgr", 
                             "bu", "sc", "sod", "pot", "hemo", "pcv", "wc", "rc", "htn", 
@@ -459,6 +492,33 @@ elif selection == "Kidney Disease":
             feature_ranges = {readable_names[i]: REFERENCE_RANGES["kidney"][column_names[i]] 
                              for i in range(len(readable_names))}
             
+            patient_metrics = {
+                "age": age,
+                "bp": bp,
+                "sg": float(sg),
+                "al": al,
+                "su": su,
+                "rbc_abnormal": 1 if rbc == "Abnormal" else 0,
+                "pc_abnormal": 1 if pc == "Abnormal" else 0,
+                "pcc_present": 1 if pcc == "Present" else 0,
+                "ba_present": 1 if ba == "Present" else 0,
+                "bgr": bgr,
+                "bu": bu,
+                "sc": sc,
+                "sod": sod,
+                "pot": pot,
+                "hemo": hemo,
+                "pcv": pcv,
+                "wc": wc,
+                "rc": rc,
+                "htn": 1 if htn == "Yes" else 0,
+                "dm": 1 if dm == "Yes" else 0,
+                "cad": 1 if cad == "Yes" else 0,
+                "appet_poor": 1 if appet == "Poor" else 0,
+                "pe": 1 if pe == "Yes" else 0,
+                "ane": 1 if ane == "Yes" else 0
+            }
+            audited_report = display_rag_report("kidney", prob, patient_metrics)
         # SHAP Explanation for Kidney Disease - captures feature impacts for PDF
         input_df = pd.DataFrame([features], columns=column_names)
         
@@ -486,11 +546,9 @@ elif selection == "Kidney Disease":
                     feature_ranges=feature_ranges, 
                     feature_impacts=shap_result["feature_impacts"],
                     pos_factors=shap_result["pos_factors"], # Top 3 Drivers
-                    neg_factors=shap_result["neg_factors"]  # Top 3 Protective
-                    # Note: shap_img_buf is removed here
+                    neg_factors=shap_result["neg_factors"],  # Top 3 Protective
+                    audited_report=audited_report
                 )
-                
-                # 2. Provide the download link
                 st.download_button(
                     label="📥 Download Clinical Summary Report",
                     data=report_bytes,
@@ -570,7 +628,7 @@ elif selection == "Heart Disease":
         # This keeps 'features' raw for the PDF report
         features_for_model = list(features)
         # 2. Scale all 6 at once
-        heart_scaler = joblib.load("../models/heart_scaler.pkl")
+        heart_scaler = joblib.load(Path(ROOT_DIR) / "models" / "heart_scaler.pkl")
         # We need to pick indices [0, 1, 2, 3, 4, 22] 
         nums_indices = [0, 1, 2, 3, 4, 22]
         nums_to_scale = np.array([features[i] for i in nums_indices]).reshape(1, -1)
@@ -595,6 +653,22 @@ elif selection == "Heart Disease":
                 st.success(f"Result: {result_text}")
                 st.progress(1 - prob)
 
+            patient_metrics = {
+                "age": age,
+                "trestbps": trestbps,
+                "chol": chol,
+                "thalach": thalach,
+                "oldpeak": oldpeak,
+                "sex_male": 1 if sex == "Male" else 0,
+                "cp_type": cp,
+                "exang": 1 if exang == "Yes" else 0,
+                "fbs": 1 if fbs == "Yes" else 0,
+                "restecg": restecg,
+                "thal": thal,
+                "ca": int(ca),
+                "cardio_risk": features[22]
+            }
+            audited_report = display_rag_report("heart", prob, patient_metrics)
 
         st.subheader("💡 Cardiac Diagnostic Insights")
         heart_labels = [
@@ -644,7 +718,8 @@ elif selection == "Heart Disease":
                 feature_ranges=feature_ranges_heart,
                 # Standardized inputs
                 pos_factors=feature_impacts_heart["pos_factors"], 
-                neg_factors=feature_impacts_heart["neg_factors"]
+                neg_factors=feature_impacts_heart["neg_factors"],
+                audited_report=audited_report if 'audited_report' in locals() else None
             )
                     
             st.download_button(
@@ -671,10 +746,21 @@ elif selection == "Diabetes":
             result_text = f"Healthy (Confidence: {1-prob:.2%})"
             st.success(f"Result: {result_text}")
             st.progress(float(1 - prob))
+        audited_report = None
         if prob is not None:
             diabetes_feature_names = ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]
             feature_ranges_diabetes = {name: REFERENCE_RANGES["diabetes"][name] for name in diabetes_feature_names}
-            
+            patient_metrics = {
+                "pregnancies": inputs[0],
+                "glucose": inputs[1],
+                "bp": inputs[2],
+                "skinthickness": inputs[3],
+                "insulin": inputs[4],
+                "bmi": inputs[5],
+                "dpf": inputs[6],
+                "age": inputs[7]
+            }
+            audited_report = display_rag_report("diabetes", prob, patient_metrics)
         
         # SHAP Explanation for Diabetes - captures feature impacts for PDF
         input_df = pd.DataFrame([inputs], columns=diabetes_feature_names)
@@ -701,7 +787,8 @@ elif selection == "Diabetes":
                                             feature_ranges=feature_ranges_diabetes, 
                                             feature_impacts=shap_result["feature_impacts"],
                                             pos_factors=shap_result["pos_factors"], # Top 3 Drivers
-                                            neg_factors=shap_result["neg_factors"]  # Top 3 Protective
+                                            neg_factors=shap_result["neg_factors"],  # Top 3 Protective
+                                            audited_report=audited_report
                                         )
                 st.download_button(
                     label="📥 Download Clinical Summary Report", 
@@ -775,7 +862,7 @@ elif selection == "Stroke":
         features[17] = medical_risk
 
         # 2. NOW convert to numpy array so it has the .flatten() method
-        scaler = joblib.load("../models/stroke_scaler.pkl")
+        scaler = joblib.load(Path(ROOT_DIR) / "models" / "stroke_scaler.pkl")
         features_array = np.array(features)
         features_scaled = scaler.transform(np.array(features).reshape(1, -1))
 
@@ -783,6 +870,7 @@ elif selection == "Stroke":
         res, prob = predict_risk("stroke", features_scaled)
         
         # Applying your custom 0.55 threshold from the notebook
+        audited_report = None
         if prob >= 0.55: 
             result_text = f"High Stroke Risk(Risk Score: {prob:.2%})"
             st.error(f"Result: {result_text}")
@@ -791,8 +879,21 @@ elif selection == "Stroke":
             result_text = f"Low Risk (Confidence: {1-prob:.2%})"
             st.success(f"Result: {result_text}")
             st.progress(1 - prob)
-            
-            
+        patient_metrics = {
+            "gender_male": 1.0 if gender == "Male" else 0.0,
+            "age": age,
+            "hypertension": 1.0 if hyper == "Yes" else 0.0,
+            "heart_disease": 1.0 if heart == "Yes" else 0.0,
+            "ever_married": 1.0 if married == "Yes" else 0.0,
+            "residence_urban": 1.0 if residence == "Urban" else 0.0,
+            "avg_glucose": avg_glucose,
+            "bmi": bmi,
+            "work": work,
+            "smoke": smoke,
+            "medical_risk": features[17]
+        }
+        audited_report = display_rag_report("stroke", prob, patient_metrics)
+        
         st.subheader("💡 Diagnostic Insights")
         stroke_features = [
             "Gender_Male", "Age", "Hypertension", "Heart Disease", 
@@ -826,7 +927,8 @@ elif selection == "Stroke":
                 feature_names=stroke_feature_names,
                 feature_ranges=feature_ranges_stroke, 
                 pos_factors=feature_impacts_stroke["pos_factors"], 
-                neg_factors=feature_impacts_stroke["neg_factors"]
+                neg_factors=feature_impacts_stroke["neg_factors"],
+                audited_report=audited_report if 'audited_report' in locals() else None
             )
 
             st.download_button(

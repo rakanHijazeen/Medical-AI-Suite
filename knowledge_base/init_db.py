@@ -9,7 +9,7 @@ def init_database():
         database="medical_ai",
         user="postgres",
         password="mysecretpassword",
-        port="5433"  # Kept on port 5433 to completely isolate from Notatk
+        port="5433"  
     )
     cursor = conn.cursor()
     
@@ -24,9 +24,9 @@ def init_database():
     -- 2. Create the data schema tracking categories, raw text, and vector spaces
     CREATE TABLE medical_chunks (
         id SERIAL PRIMARY KEY,
-        disease_category VARCHAR(50) NOT NULL, -- 'heart', 'stroke', 'kidney'
+        disease_category VARCHAR(50) NOT NULL, -- 'heart', 'stroke', 'kidney', 'diabetes'
         chunk_text TEXT NOT NULL,
-        embedding VECTOR(1536) NOT NULL        -- 1536 dimensions for standard OpenAI/cohere embeddings
+        embedding VECTOR(384) NOT NULL         -- 384 dimensions to match all-MiniLM-L6-v2 embeddings
     );
 
     -- 3. Create a fast vector lookup index for your retrieval search queries
