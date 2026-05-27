@@ -24,7 +24,7 @@ def setup_logger(name="medical_ai"):
 
     # 2. Define target-specific format layouts
     file_formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)s] (%(filename)s:%(lineno)d) - %(message)s",
+        "%(asctime)s | %(levelname)-8s | %(filename)s:%(lineno)d | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
     
