@@ -20,7 +20,7 @@ class MedicalRAGEngine:
         self.model = "llama-3.1-8b-instant"
         logger.info(f"MedicalRAGEngine initialized successfully using core model: {self.model}")
 
-    def generate_clinical_explanation(self, disease: str, risk_score: float, patient_metrics: dict, context_chunks: list) -> str:
+    def generate_clinical_explanation(self, disease: str, risk_score: float, patient_metrics: dict, context_chunks: list, status_updater=None) -> str:
         formatted_context = "\n\n".join([f"- {chunk}" for chunk in context_chunks])
         
         system_prompt = (
@@ -67,7 +67,9 @@ class MedicalRAGEngine:
         try:
             # --- STAGE 1: LOG GENERATION INITIATION ---
             logger.info(f"Sending Stage 1 prompt to Groq for disease framework: {disease.upper()}")
-            
+            if status_updater:
+                status_updater.update(label="🧠 Stage 1: Analyzing patient metrics against clinical guidelines...", state="running")
+
             gen_response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -84,7 +86,9 @@ class MedicalRAGEngine:
             # STAGE 2: THE GUARD / AUDITOR LLM
             # =====================================================================
             logger.info("Passing output to Stage 2 Auditor LLM for clinical compliance validation...")
-            
+            if status_updater:
+                status_updater.update(label="🛡️ Stage 2: Adversarial Auditor fact-checking for hallucinations...", state="running")
+
             guard_system_prompt = (
             "You are a adversarial Medical AI Fact-Checker. Your sole function is to catch hallucinations.\n\n"
             "Compare the [GENERATED ASSESSMENT] against the [RAW SOURCE MEDICAL TRUTH].\n"
@@ -136,6 +140,9 @@ class MedicalRAGEngine:
 
             # --- STAGE 3: TELEMETRY EVALUATION LOGGING ---
             # Simple heuristic: If the auditor removed or heavily modified the text structure, flag as potential hallucination
+            if status_updater:
+                status_updater.update(label="💾 Stage 3: Committing telemetry metrics to PostgreSQL database...", state="running")
+            
             is_hallucination = False
             if len(initial_explanation.strip()) != len(final_audited_report.strip()):
                 is_hallucination = True
@@ -151,12 +158,17 @@ class MedicalRAGEngine:
                 report=final_audited_report,
                 hallucination=is_hallucination
             )
+            if status_updater:
+                status_updater.update(label="✅ Clinical report fully audited and verified!", state="complete")
+
             logger.info("PostgreSQL metrics transaction committed successfully.")
             
             return final_audited_report
 
         except Exception as e:
             logger.error(f"Execution boundary error encountered inside dual-LLM execution chain: {str(e)}")
+            if status_updater:
+                status_updater.update(label="❌ Error running dual-LLM pipeline", state="error")
             return f"❌ Error running dual-LLM pipeline: {str(e)}"
 # Simulating main app context
 if __name__ == "__main__":

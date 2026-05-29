@@ -240,7 +240,7 @@ def display_rag_report(disease, risk_score, patient_metrics):
     with st.expander("🔎 Generate Clinical Audit (RAG)"):
         try:
             st.info("Generating audited clinical guidance from the medical knowledge base.")
-            
+
             # =================================================================
             # REUSED SHAP FEATURE MAPPING ZONE
             # =================================================================
@@ -286,12 +286,14 @@ def display_rag_report(disease, risk_score, patient_metrics):
                 clean_key = active_disease_map.get(raw_key.lower().strip(), raw_key.replace('_', ' ').title())
                 clean_patient_metrics[clean_key] = value
 
+            with st.status("🔍 Initializing Medical RAG Pipeline...", expanded=True) as status:
             # Pass the translated, human-readable metrics into your RAG engine
-            audited_report = generate_medical_audit(
-                disease=disease,
-                risk_score=float(risk_score),
-                patient_metrics=clean_patient_metrics
-            )
+                audited_report = generate_medical_audit(
+                    disease=disease,
+                    risk_score=float(risk_score),
+                    patient_metrics=clean_patient_metrics,
+                    status_updater=status
+                )
             
             if audited_report:
                 st.markdown("### 📝 RAG-Audited Clinical Summary")

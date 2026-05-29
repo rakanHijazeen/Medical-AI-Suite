@@ -19,7 +19,7 @@ def _get_engine():
         _ENGINE_INSTANCE = MedicalRAGEngine()
     return _ENGINE_INSTANCE
 
-def generate_medical_audit(disease: str, risk_score: float, patient_metrics: dict) -> str:
+def generate_medical_audit(disease: str, risk_score: float, patient_metrics: dict, status_updater=None) -> str:
     """
     Orchestrates the clean RAG pipeline lifecycle using optimized, 
     natural-language semantic search extraction.
@@ -51,7 +51,8 @@ def generate_medical_audit(disease: str, risk_score: float, patient_metrics: dic
         disease=disease,
         risk_score=risk_score,
         patient_metrics=patient_metrics,
-        context_chunks=context_chunks
+        context_chunks=context_chunks,
+        status_updater=status_updater
     )
     
     return report
