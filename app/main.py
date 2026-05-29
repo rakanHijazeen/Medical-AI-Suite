@@ -233,22 +233,71 @@ def generate_shap_explanation(model, input_df, model_name, scaler=None, output_p
 
 
 def display_rag_report(disease, risk_score, patient_metrics):
-    """Generate and display RAG-audited clinical guidance."""
+    """Generate and display RAG-audited clinical guidance using synchronized SHAP names."""
     if not patient_metrics or risk_score is None:
         return None
 
     with st.expander("🔎 Generate Clinical Audit (RAG)"):
         try:
             st.info("Generating audited clinical guidance from the medical knowledge base.")
+            
+            # =================================================================
+            # REUSED SHAP FEATURE MAPPING ZONE
+            # =================================================================
+            feature_name_map = {
+                "kidney": {
+                    "age": "Age", "bp": "Blood Pressure", "sg": "Specific Gravity", 
+                    "al": "Albumin", "su": "Sugar", "rbc": "Red Blood Cells",
+                    "pc": "Pus Cells", "pcc": "Pus Cell Clumps", "ba": "Bacteria",
+                    "bgr": "Blood Glucose Random", "bu": "Blood Urea", "sc": "Serum Creatinine",
+                    "sod": "Sodium", "pot": "Potassium", "hemo": "Hemoglobin",
+                    "pcv": "Packed Cell Volume", "wc": "White Blood Cells", "rc": "Red Blood Cell Count",
+                    "htn": "Hypertension", "dm": "Diabetes Mellitus", "cad": "Coronary Artery Disease",
+                    "appet": "Appetite", "pe": "Pedal Edema", "ane": "Anemia"
+                },
+                "heart": {
+                    "age": "Age", "trestbps": "Resting Blood Pressure", "chol": "Cholesterol",
+                    "thalach": "Max Heart Rate Achieved", "oldpeak": "ST Depression",
+                    "sex_1": "Sex (Male)", "cp_1": "Chest Pain Type 1", "cp_2": "Chest Pain Type 2",
+                    "cp_3": "Chest Pain Type 3", "fbs_1": "Fasting Blood Sugar > 120",
+                    "restecg_1": "Resting ECG 1", "restecg_2": "Resting ECG 2",
+                    "exang_1": "Exercise Induced Angina", "slope_1": "Slope of ST 1",
+                    "slope_2": "Slope of ST 2", "ca_1": "Coronary Calcification 1",
+                    "ca_2": "Coronary Calcification 2", "ca_3": "Coronary Calcification 3",
+                    "thal_1": "Thalassemia Type 1", "thal_2": "Thalassemia Type 2",
+                    "thal_3": "Thalassemia Type 3", "thal_4": "Thalassemia Type 4"
+                },
+                "diabetes": {
+                    "Pregnancies": "Number of Pregnancies", "Glucose": "Glucose Level",
+                    "BP": "Blood Pressure", "SkinThickness": "Skin Thickness",
+                    "Insulin": "Insulin Level", "BMI": "Body Mass Index",
+                    "DPF": "Diabetes Pedigree Function", "Age": "Age"
+                },
+                "stroke": {}
+            }
+
+            # Extract the specific map for the active disease category
+            # Fallback to empty dict if the disease string has an unexpected format
+            active_disease_map = feature_name_map.get(disease.lower().strip(), {})
+            
+            # Rebuild a clean metrics dictionary using your SHAP mappings
+            clean_patient_metrics = {}
+            for raw_key, value in patient_metrics.items():
+                clean_key = active_disease_map.get(raw_key.lower().strip(), raw_key.replace('_', ' ').title())
+                clean_patient_metrics[clean_key] = value
+
+            # Pass the translated, human-readable metrics into your RAG engine
             audited_report = generate_medical_audit(
                 disease=disease,
                 risk_score=float(risk_score),
-                patient_metrics=patient_metrics
+                patient_metrics=clean_patient_metrics
             )
+            
             if audited_report:
                 st.markdown("### 📝 RAG-Audited Clinical Summary")
                 st.write(audited_report)
                 return audited_report
+                
             st.warning("RAG generated no summary.")
         except Exception as exc:
             st.error(f"RAG audit failed: {exc}")

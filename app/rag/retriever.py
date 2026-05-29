@@ -1,23 +1,19 @@
+import os
 import psycopg2
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv 
 
-# Load environment variables from the root .env file
 load_dotenv()
 
-import os
-# Force sentence-transformers to use local weights instead of pinging the web
+# Prevent unnecessary internet pings on production environments
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 class MedicalRAGRetriever:
     def __init__(self):
-        # Initialize the same 384-dimensional local model used during ingestion
-        # It stays in RAM, footprint is small (~150MB), perfectly safe for your system
         self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
         
     def _connect_db(self):
-        """Internal helper to access the isolated port 5433 Docker instance."""
         return psycopg2.connect(
             host=os.getenv("DB_HOST"),
             database=os.getenv("DB_NAME"),
@@ -28,17 +24,17 @@ class MedicalRAGRetriever:
 
     def retrieve_context(self, disease_category: str, query_text: str, top_k: int = 3) -> list:
         """
-        Encodes the search query locally and pulls the top_k most contextually
-        relevant clinical reference chunks from the database using cosine similarity.
+        Encodes search queries, handles pgvector cosine matching, and sanitizes 
+        ingestion metadata headers before sending context data to the LLM pipeline.
         """
-        # 1. Compute query vector locally (outputs 384 dimensions)
+        # 1. Compute query vector locally
         query_vector = self.embedding_model.encode(query_text).tolist()
         
-        conn = self._connect_db()
-        cursor = conn.cursor()
+        conn = None
+        cursor = None
+        context_chunks = []
         
-        # 2. Leverage pgvector's <=> operator (Cosine Distance) for semantic matching.
-        # Filter down strictly by disease_category so it doesn't leak cross-domain references.
+        # 2. Query execution using Cosine Distance (<=>)
         search_query = """
         SELECT chunk_text 
         FROM medical_chunks 
@@ -48,32 +44,45 @@ class MedicalRAGRetriever:
         """
         
         try:
+            conn = self._connect_db()
+            cursor = conn.cursor()
+            
             cursor.execute(search_query, (disease_category.lower(), query_vector, top_k))
             rows = cursor.fetchall()
             
-            # Extract strings from the returned tuples list
-            context_chunks = [row[0] for row in rows]
+            for row in rows:
+                raw_text = row[0]
+                
+                # Clean up old ingestion headers so they do not confuse Llama 3.1
+                if "\n" in raw_text and raw_text.startswith("[CONTEXT:"):
+                    # Splits at the first newline character, discarding the raw metadata bracket
+                    clean_text = raw_text.split("\n", 1)[1].strip()
+                else:
+                    clean_text = raw_text.strip()
+                    
+                context_chunks.append(clean_text)
+                
             return context_chunks
             
         except Exception as e:
             print(f"❌ Database Retrieval Error: {e}")
             return []
         finally:
-            cursor.close()
-            conn.close()
+            # Safe closing pattern preventing UnboundLocalErrors
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
 
-# Simulating isolation testing
 if __name__ == "__main__":
-    print("🔍 Testing MedicalRAGRetriever against local vector database (port 5433)...")
-    
+    print("🔍 Testing MedicalRAGRetriever against local vector database...")
     retriever = MedicalRAGRetriever()
     
-    # Test a mock medical prompt search
     test_disease = "stroke"
-    test_query = "What should be done if blood pressure or hypertension values are highly elevated?"
+    test_query = "Protocol for calculated risk exceeding 80 percent and immediate blood pressure control."
     
     matched_chunks = retriever.retrieve_context(disease_category=test_disease, query_text=test_query, top_k=2)
     
-    print("\n--- RETRIEVED SEMANTIC DATABASE CHUNKS ---")
+    print("\n--- SANITIZED RETRIEVED MEDICAL CHUNKS ---")
     for i, chunk in enumerate(matched_chunks, 1):
-        print(f"\n[Match {i}]\n{chunk}")
+        print(f"\n[Clean Match {i}]\n{chunk}")
