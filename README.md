@@ -148,35 +148,48 @@ While standard ML models excel at calculating risk percentages from raw clinical
 ### Execution Steps
 
 1. Clone the project tree:
+
    ```bash
    git clone [https://github.com/rakanHijazeen/Medical-AI-Suite.git](https://github.com/rakanHijazeen/Medical-AI-Suite.git)
    cd Medical-AI-Suite
-   Build and launch the database container:
    ```
 
-Bash
-docker-compose up -d
-Initialize python dependencies:
+   Build and launch the database container:
 
-Bash
-pip install -r requirements.txt
-Set up your local environment configuration:
-Create a .env file in the root directory and configure your credentials (use placeholder patterns below as a template reference):
+   ```bash
+   docker-compose up -d
+   ```
 
-Code snippet
-GROQ_API_KEY=your_actual_groq_api_key_here
-DATABASE_URL=postgresql://postgres:password@localhost:5432/medical_rag
-Populate the RAG Vector Knowledge Base:
-Run the database initialization script to parse local medical guideline PDFs, generate the dense vector embeddings, and seed your local Docker database container:
+   Initialize python dependencies:
 
-Bash
-python knowledge_base/init_db.py
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-▶️ Usage
-Start the platform web-app interface:
+   Set up your local environment configuration:
+   Create a .env file in the root directory and configure your credentials (use placeholder patterns below as a template reference):
 
-Bash
-streamlit run app/main.py
+   ## Code snippet
+
+   GROQ_API_KEY=your_actual_groq_api_key_here
+   DATABASE_URL=postgresql://postgres:password@localhost:5432/medical_rag
+
+   ***
+
+   Populate the RAG Vector Knowledge Base:
+   Run the database initialization script to parse local medical guideline PDFs, generate the dense vector embeddings, and seed your local Docker database container:
+
+   ```bash
+   python knowledge_base/init_db.py
+   ```
+
+   ▶️ Usage
+   Start the platform web-app interface:
+
+   ```bash
+   streamlit run app/main.py
+   ```
+
 Select an assessment workspace via the navigation layout (Kidney, Heart, Diabetes, or Stroke).
 
 Populate patient metrics and baseline laboratory values.
