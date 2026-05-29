@@ -162,26 +162,19 @@ def create_report(patient_name, disease, result, probability, patient_features=N
             for factor in neg_factors:
                 pdf.cell(0, 7, text=f"  > {factor}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-        # 3. Clinical Note
-        pdf.ln(10)
-        pdf.set_font("helvetica", "I", 9)
-        pdf.multi_cell(0, 5, text="Note: These factors are identified using SHAP explainability analysis. "
+    # 3. Clinical Note
+    pdf.ln(10)
+    pdf.set_font("helvetica", "I", 9)
+    pdf.multi_cell(0, 5, text="Note: These factors are identified using SHAP explainability analysis. "
                                 "Drivers indicated with [!] pushed the risk score higher, while factors "
                                 "marked with [+] helped lower the final risk assessment.")                
-        # === CLINICIAN SIGNATURE ===
-        pdf.set_font("helvetica", "B", 11)
-        pdf.cell(0, 8, text="CLINICIAN REVIEW & SIGNATURE", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("helvetica", size=10)
-        pdf.cell(0, 6, text="Clinician Name (Print): _____________________________", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.cell(0, 6, text="Signature: ________________________  Date: _________", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.ln(5)
-
+    
     if audited_report:
         pdf.ln(8)
         pdf.set_font("helvetica", "B", 12)
         pdf.cell(0, 8, text="RAG-Audited Clinical Guidance", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_font("helvetica", size=10)
-        
+            
         report_text = str(audited_report)
         replacements = {
             "\u2013": "-",  # En-dash
@@ -194,12 +187,22 @@ def create_report(patient_name, disease, result, probability, patient_features=N
         }
         for bad_char, good_char in replacements.items():
             report_text = report_text.replace(bad_char, good_char)
-            
-        # 2. Strict fallback safety net to catch any other unsupported tokens
-        cleaned_report = report_text.encode('latin-1', 'ignore').decode('latin-1')
+                
+    # 2. Strict fallback safety net to catch any other unsupported tokens
+    cleaned_report = report_text.encode('latin-1', 'ignore').decode('latin-1')
         
-        # 3. Print the safe string
-        pdf.multi_cell(0, 6, text=cleaned_report)
+    # 3. Print the safe string
+    pdf.multi_cell(0, 6, text=cleaned_report)
+    
+    # === CLINICIAN SIGNATURE ===
+    pdf.set_font("helvetica", "B", 11)
+    pdf.cell(0, 8, text="CLINICIAN REVIEW & SIGNATURE", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font("helvetica", size=10)
+    pdf.cell(0, 6, text="Clinician Name (Print): _____________________________", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 6, text="Signature: ________________________  Date: _________", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.ln(5)
+
+
 
 # 1. FORCE a clean break and drop down vertically by 10 units
     pdf.ln(10)  
