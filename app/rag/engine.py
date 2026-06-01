@@ -1,4 +1,8 @@
 import os 
+import re
+import json
+import time
+from typing import Optional
 from dotenv import load_dotenv
 import psycopg2 # Added to handle DB connection check
 from groq import Groq 
@@ -20,23 +24,176 @@ class MedicalRAGEngine:
         self.model = "llama-3.1-8b-instant"
         logger.info(f"MedicalRAGEngine initialized successfully using core model: {self.model}")
 
-    def generate_clinical_explanation(self, disease: str, risk_score: float, patient_metrics: dict, context_chunks: list, status_updater=None) -> str:
-        formatted_context = "\n\n".join([f"- {chunk}" for chunk in context_chunks])
-        
+    def _stream_and_collect(self, call_fn, stream_callback=None):
+        """
+        Helper to call model API with best-effort streaming. Accepts a zero-arg callable
+        that invokes the underlying SDK call (preferably with streaming enabled).
+        Calls `stream_callback` for each incremental chunk when available and
+        returns the fully concatenated text.
+        """
+        collected = ""
+        try:
+            # Try streaming mode first (SDKs often accept `stream=True`)
+            resp_iter = call_fn(stream=True)
+            for chunk in resp_iter:
+                try:
+                    # Attempt common delta/message shapes
+                    part = None
+                    if hasattr(chunk, "choices"):
+                        c0 = chunk.choices[0]
+                        # delta content
+                        if hasattr(c0, "delta") and getattr(c0.delta, "content", None):
+                            part = c0.delta.content
+                        # full message
+                        elif hasattr(c0, "message") and getattr(c0.message, "content", None):
+                            part = c0.message.content
+                    # Fallback: if chunk is plain str
+                    if part is None and isinstance(chunk, str):
+                        part = chunk
+                    if part:
+                        collected += part
+                        if stream_callback:
+                            try:
+                                stream_callback(part)
+                            except Exception:
+                                logger.debug("stream_callback raised an exception; continuing.")
+                except Exception:
+                    continue
+            return collected
+        except TypeError:
+            # SDK may not accept stream param; fall back to non-streaming
+            resp = call_fn()
+            text = None
+            try:
+                text = resp.choices[0].message.content
+            except Exception:
+                # Last resort: try attr 'text'
+                text = getattr(resp, 'text', str(resp))
+            if stream_callback and text:
+                try:
+                    stream_callback(text)
+                except Exception:
+                    logger.debug("stream_callback raised an exception in fallback.")
+            return text or ""
+
+    def _stream_text(self, text: str, status_updater, label: str = "Streaming:"):
+        """Chunk a full text and push incremental updates to status_updater.
+
+        Used when SDK streaming is not available but the UI still expects
+        incremental updates.
+        """
+        if not status_updater or not text:
+            return
+        chunk_size = 250
+        for i in range(0, len(text), chunk_size):
+            piece = text[i:i+chunk_size]
+            try:
+                status_updater.update(label=f"{label} {piece}", state="running")
+            except Exception:
+                pass
+            time.sleep(0.02)
+
+    def _parse_citations_from_stage1(self, stage1_output: str) -> list:
+        """Extract citation IDs like [CHUNK: 2] or JSON {"citations": [0,1]} from the LLM output."""
+        if not stage1_output:
+            return []
+        citations = []
+        # Find bracket citations [CHUNK: 2], [GUIDELINE_ID: A4]
+        bracket_pattern = r"\[(?:CHUNK|GUIDELINE_ID|SOURCE|ID):\s*([A-Za-z0-9_\-]+)\]"
+        for m in re.findall(bracket_pattern, stage1_output):
+            citations.append(m)
+
+        # Try to parse JSON-style citations if present
+        try:
+            # look for a JSON object with a citations key
+            json_match = re.search(r"\{.*?\"citations\"\s*:\s*\[.*?\].*?\}", stage1_output, re.DOTALL)
+            if json_match:
+                j = json.loads(json_match.group(0))
+                if isinstance(j.get("citations"), list):
+                    citations.extend([str(x) for x in j.get("citations")])
+        except Exception:
+            logger.debug("No JSON citations parsed from Stage 1 output.")
+
+        # Deduplicate preserving order
+        seen = set()
+        out = []
+        for c in citations:
+            if c not in seen:
+                seen.add(c)
+                out.append(c)
+        logger.info(f"Extracted citations from Stage1: {out}")
+        return out
+
+    def _filter_context_by_citations(self, context_chunks: list, citations: list) -> list:
+        """Return only chunks referenced by the citations list. Citations may be indices or substrings."""
+        if not citations:
+            logger.warning("No citations extracted; returning full context_chunks.")
+            return context_chunks
+        filtered = []
+        for c in citations:
+            # try index
+            try:
+                idx = int(c)
+                if 0 <= idx < len(context_chunks):
+                    filtered.append(context_chunks[idx])
+                    continue
+            except Exception:
+                pass
+            # match by substring or chunk id prefix
+            for chunk in context_chunks:
+                if c.lower() in chunk.lower() or chunk.startswith(f"- {c}") or chunk.startswith(c):
+                    if chunk not in filtered:
+                        filtered.append(chunk)
+                    break
+        if not filtered:
+            logger.warning("Filtering produced empty set; returning full context_chunks.")
+            return context_chunks
+        logger.info(f"Context filtered to {len(filtered)} chunks from {len(context_chunks)} total.")
+        return filtered
+
+    def _format_chunks_with_indices(self, context_chunks: list) -> str:
+        if not context_chunks:
+            return "NO CONTEXT CHUNKS PROVIDED."
+        formatted = []
+        for i, chunk in enumerate(context_chunks):
+            formatted.append(f"[CHUNK: {i}] {chunk}")
+        return "\n\n".join(formatted)
+
+    def generate_clinical_explanation(self, disease: str, risk_score: float, patient_metrics: dict, context_chunks: list, status_updater=None, stream_callback=None) -> str:
+        """
+        Generate a clinical explanation and run a two-stage audit while streaming
+        partial outputs to `stream_callback` when available.
+
+        Args:
+            disease: disease name
+            risk_score: model probability (0-1)
+            patient_metrics: input metrics dict
+            context_chunks: list of guideline text chunks
+            status_updater: optional status UI object
+            stream_callback: optional callable(str) to receive incremental text
+
+        Returns:
+            Final audited report string
+        """
         system_prompt = (
             "You are an expert Clinical Systems Analyst and Medical AI.\n"
             "Your task is to write a cohesive, professional evaluation of a patient's lab metrics based ONLY on the provided reference texts.\n\n"
+            "CITATION REQUIREMENT:\n"
+            "- For every clinical guideline, reference range, or recommendation you cite, include the specific source chunk ID in [CHUNK: ID] format.\n"
+            "- Example: 'According to the CKD progression framework [CHUNK: 3], hemoglobin below 12 g/dL indicates anemia complications.'\n\n"
             "CRITICAL WRITING INSTRUCTIONS:\n"
             "- Do NOT create a robotic list of every single metric saying 'not mentioned'. If a metric is not mentioned in the text, do not list it as a separate bullet point.\n"
             "- Instead, focus heavily on the data that IS present in the reference text (e.g., Albuminuria, Hemoglobin, CKD progression, RASi treatment).\n"
             "- Synthesize the patient's overall status. For example, note how their Albumin level of 1 or Hemoglobin level relates to the broad CKD outcomes and severities discussed in the guidelines.\n"
-            "- Write in a narrative, professional medical tone. Cite your sources using (SOURCE: CATEGORY | CHUNK: ID) naturally within sentences."
+            "- Write in a narrative, professional medical tone. Ensure every external claim is tagged with its source chunk."
         )
-                
+
         user_prompt = f"""
         ### INSTRUCTIONS
         Cross-reference the [PATIENT METRICS] with the [VERIFIED CLINICAL GUIDELINES]. 
         Explain how the patient's specific metrics correlate to the risk framework *strictly* using the provided text.
+        
+        IMPORTANT: After each guideline reference or clinical claim, include [CHUNK: X] tags to indicate which source chunk(s) you used.
 
         ### RISK ASSESSMENT FRAMEWORK (CRITICAL EVALUATION SCALE)
         - Risk Score Range 0.00 to 0.30: LOW RISK. Focus on standard lifestyle preventative measures.
@@ -49,55 +206,73 @@ class MedicalRAGEngine:
         - Raw Input Features: {patient_metrics}
 
         [VERIFIED CLINICAL GUIDELINES]
-        {formatted_context if formatted_context else "CRITICAL ERROR: No clinical guidelines provided."}
+        {self._format_chunks_with_indices(context_chunks)}
 
         ### REQUIRED OUTPUT FORMAT
         Provide your analysis using the following layout structure. If a section cannot be completed using ONLY the guidelines, write "Data not present in reference text."
+        Include [CHUNK: X] citations for every external reference.
 
         #### 1. Risk Score Contextualization
-        (Explain what the {risk_score * 100:.1f}% score means based *only* on thresholds found in the guidelines)
+        (Explain what the {risk_score * 100:.1f}% score means based *only* on thresholds found in the guidelines [CHUNK: X])
 
         #### 2. Metric Evaluation against Guidelines
-        (Cross-reference the raw features {patient_metrics} with explicit rules in the guidelines)
+        (Cross-reference the raw features {patient_metrics} with explicit rules in the guidelines [CHUNK: X, Y, Z])
 
         #### 3. Clinical Disclaimers / Missing Data
         (List any patient metrics that were completely missing or unaddressed by the retrieved guidelines)
         """
 
         try:
-            # --- STAGE 1: LOG GENERATION INITIATION ---
-            logger.info(f"Sending Stage 1 prompt to Groq for disease framework: {disease.upper()}")
+            # --- STAGE 1: GENERATE WITH CITATIONS (STREAMING WHEN AVAILABLE) ---
+            logger.info(f"Stage 1: Analyzing patient metrics for disease: {disease.upper()}")
             if status_updater:
                 status_updater.update(label="🧠 Stage 1: Analyzing patient metrics against clinical guidelines...", state="running")
 
-            gen_response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.2,
-                max_tokens=1024
-            )
-            initial_explanation = gen_response.choices[0].message.content
-            logger.info("Stage 1 raw clinical explanation generated.")
+            def _call_stage1(**kwargs):
+                return self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+                    temperature=0.2,
+                    max_tokens=1024,
+                    **kwargs
+                )
+
+            # Prefer the provided stream_callback; otherwise stream to status_updater
+            if stream_callback:
+                initial_explanation = self._stream_and_collect(_call_stage1, stream_callback=stream_callback)
+            else:
+                def _stage1_cb(part: str):
+                    if status_updater:
+                        try:
+                            status_updater.update(label=f"🧠 Stage 1 (stream): {part}", state="running")
+                        except Exception:
+                            pass
+                initial_explanation = self._stream_and_collect(_call_stage1, stream_callback=_stage1_cb)
+            logger.info("Stage 1: Clinical explanation generated with citations.")
+
+            # --- EXTRACT CITATIONS & FILTER CONTEXT ---
+            logger.info("Extracting citations from Stage 1 output...")
+            citations = self._parse_citations_from_stage1(initial_explanation or "")
+            logger.info("Filtering context chunks based on Stage 1 citations...")
+            filtered_context_chunks = self._filter_context_by_citations(context_chunks, citations)
+            filtered_context = "\n\n".join([f"- {chunk}" for chunk in filtered_context_chunks])
 
             # =====================================================================
-            # STAGE 2: THE GUARD / AUDITOR LLM
+            # STAGE 2: AUDITOR WITH FILTERED CONTEXT ONLY (STREAMING WHEN AVAILABLE)
             # =====================================================================
-            logger.info("Passing output to Stage 2 Auditor LLM for clinical compliance validation...")
+            logger.info("Stage 2: Passing auditor with filtered context for efficiency...")
             if status_updater:
                 status_updater.update(label="🛡️ Stage 2: Adversarial Auditor fact-checking for hallucinations...", state="running")
 
             guard_system_prompt = (
-            "You are a adversarial Medical AI Fact-Checker. Your sole function is to catch hallucinations.\n\n"
-            "Compare the [GENERATED ASSESSMENT] against the [RAW SOURCE MEDICAL TRUTH].\n"
-            "Identify every medical claim, benchmark, drug, or numerical range mentioned in the assessment.\n\n"
-            "CRITICAL TEST:\n"
-            "Is that exact claim or benchmark supported word-for-word or conceptually by the [RAW SOURCE MEDICAL TRUTH]?\n"
-            "- If YES: Retain the sentence completely.\n"
-            "- If NO / partial match: You must completely delete the sentence or paragraph.\n\n"
-            "Output ONLY the finalized, safely stripped version of the assessment. Do not add introductions or conclusions."
+                "You are a adversarial Medical AI Fact-Checker. Your sole function is to catch hallucinations.\n\n"
+                "Compare the [GENERATED ASSESSMENT] against the [FILTERED SOURCE MEDICAL TRUTH].\n"
+                "Identify every medical claim, benchmark, drug, or numerical range mentioned in the assessment.\n\n"
+                "CRITICAL TEST:\n"
+                "Is that exact claim or benchmark supported word-for-word or conceptually by the [FILTERED SOURCE MEDICAL TRUTH]?\n"
+                "- If YES: Retain the sentence completely.\n"
+                "- If NO / partial match: You must completely delete the sentence or paragraph.\n\n"
+                "Output ONLY the finalized, safely stripped version of the assessment. Do not add introductions or conclusions."
             )
 
             guard_user_prompt = f"""
@@ -108,52 +283,60 @@ class MedicalRAGEngine:
                 - Risk Score Range 0.31 to 0.70: MODERATE RISK. Requires clinical review, metabolic monitoring, and primary prevention strategies.
                 - Risk Score Range 0.71 to 1.00: HIGH RISK. Requires immediate clinical evaluation, aggressive risk factor management, and secondary preventative interventions.
 
-                ### RAW SOURCE MEDICAL TRUTH (REFERENCE ONLY)
-                {formatted_context if formatted_context else "NO REFERENCE DATA AVAILABLE."}
+                ### FILTERED SOURCE MEDICAL TRUTH (STAGE 1 REFERENCED CHUNKS ONLY)
+                {filtered_context if filtered_context.strip() else "NO REFERENCED CHUNKS AVAILABLE."}
 
                 ### GENERATED ASSESSMENT TO AUDIT
                 {initial_explanation}
 
                 ### AUDIT EXECUTION DIRECTIVE
                 Review every assertion, metric range, and recommendation in the [GENERATED ASSESSMENT]. 
-                Cross-reference it with both the SYSTEM VERIFIED TRUTHS and the RAW SOURCE MEDICAL TRUTH. 
+                Cross-reference it with both the SYSTEM VERIFIED TRUTHS and the FILTERED SOURCE MEDICAL TRUTH. 
 
                 - If a claim about a risk tier matches the 3-tier framework scale above, RETAIN IT.
-                - If a claim about a lab metric matches the reference values or the PDF chunks, RETAIN IT.
+                - If a claim about a lab metric matches the filtered reference values, RETAIN IT.
                 - If any clinical claim is completely missing from both references, delete that sentence or paragraph entirely.
                 
                 Output ONLY the finalized, safely stripped text. No explanations, no pleasantries.
                 """
 
-            audit_response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": guard_system_prompt},
-                    {"role": "user", "content": guard_user_prompt}
-                ],
-                temperature=0.1, 
-                max_tokens=1024
-            )
-            
-            final_audited_report = audit_response.choices[0].message.content
-            logger.info("Stage 2 clinical audit evaluation complete.")
+            def _call_stage2(**kwargs):
+                return self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "system", "content": guard_system_prompt}, {"role": "user", "content": guard_user_prompt}],
+                    temperature=0.1,
+                    max_tokens=1024,
+                    **kwargs
+                )
+
+            if stream_callback:
+                final_audited_report = self._stream_and_collect(_call_stage2, stream_callback=stream_callback)
+            else:
+                def _stage2_cb(part: str):
+                    if status_updater:
+                        try:
+                            status_updater.update(label=f"🛡️ Stage 2 (stream): {part}", state="running")
+                        except Exception:
+                            pass
+                final_audited_report = self._stream_and_collect(_call_stage2, stream_callback=_stage2_cb)
+            logger.info("Stage 2: Clinical audit evaluation complete.")
 
             # --- STAGE 3: TELEMETRY EVALUATION LOGGING ---
-            # Simple heuristic: If the auditor removed or heavily modified the text structure, flag as potential hallucination
             if status_updater:
                 status_updater.update(label="💾 Stage 3: Committing telemetry metrics to PostgreSQL database...", state="running")
-            
+
             is_hallucination = False
-            if len(initial_explanation.strip()) != len(final_audited_report.strip()):
+            if (initial_explanation or "").strip() != (final_audited_report or "").strip():
                 is_hallucination = True
                 logger.warning(f"Hallucination mitigation triggered by Auditor for entry type: {disease.upper()}")
 
+            logger.info(f"Token efficiency: Original context size={len(context_chunks)}, Filtered size={len(filtered_context_chunks)}")
             logger.info("Shipping transactional entry metrics to PostgreSQL database...")
             log_evaluation(
                 category=disease,
                 score=risk_score,
                 metrics=patient_metrics,
-                chunks=context_chunks,
+                chunks=filtered_context_chunks,  # Log only the filtered chunks used
                 explanation=initial_explanation,
                 report=final_audited_report,
                 hallucination=is_hallucination

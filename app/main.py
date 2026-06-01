@@ -14,43 +14,14 @@ import os
 import shap
 import io
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import  StandardScaler
+from sklearn.preprocessing import StandardScaler
 from app.rag import generate_medical_audit
+from app.config import MODEL_PATHS, FEATURE_NAME_MAP, REFERENCE_RANGES, FEATURE_COLUMNS, RISK_THRESHOLDS
 from pdf_report import create_report
 
-# Reference ranges for each disease's features
-REFERENCE_RANGES = {
-    "kidney": {
-        "age": "18-80 years", "bp": "90-120 mmHg", "sg": "1.010-1.020", "al": "0-2", "su": "0",
-        "rbc": "Normal", "pc": "Normal", "pcc": "Not Present", "ba": "Not Present", "bgr": "70-100 mg/dL",
-        "bu": "7-20 mg/dL", "sc": "0.7-1.3 mg/dL", "sod": "136-145 mEq/L", "pot": "3.5-5.0 mEq/L",
-        "hemo": "12-16 g/dL", "pcv": "36-46%", "wc": "4500-11000 /µL", "rc": "4.5-5.9 M/µL",
-        "htn": "No", "dm": "No", "cad": "No", "appet": "Good", "pe": "No", "ane": "No"
-    },
-    "heart": {
-        "age": "25-75 years", "trestbps": "90-120 mmHg", "chol": "<200 mg/dL", "thalach": "60-100 bpm",
-        "oldpeak": "0.0", "sex_1": "N/A", "cp_1": "No", "cp_2": "No", "cp_3": "No",
-        "fbs_1": "No", "restecg_1": "No", "restecg_2": "No", "exang_1": "No",
-        "slope_1": "No", "slope_2": "No", "ca_1": "0", "ca_2": "0", "ca_3": "0", "ca_4": "0",
-        "thal_1": "No", "thal_2": "No", "thal_3": "No", "thal_4": "No"
-    },
-    "diabetes": {
-        "Pregnancies": "0-5", "Glucose": "70-100 mg/dL", "BP": "90-120 mmHg",
-        "SkinThickness": "20-30 mm", "Insulin": "12-166 µIU/mL", "BMI": "18.5-24.9",
-        "DPF": "0.1-0.8", "Age": "21-80 years"
-    },
-    "stroke": {
-        "Gender_Male": "N/A", "Age": "18-80 years", "Hypertension": "No", "Heart Disease": "No",
-        "Ever_Married_Yes": "N/A", "Residence_type_Urban": "N/A", "Avg Glucose Level": "70-100 mg/dL",
-        "BMI": "18.5-24.9", "Work_Govt": "N/A", "Work_Never": "N/A", "Work_Private": "N/A",
-        "Work_Self": "N/A", "Work_children": "N/A", "Smoke_Unknown": "N/A", "Smoke_formerly": "N/A",
-        "Smoke_never": "N/A", "Smoke_smokes": "N/A", "Medical_Risk_Factor": "Low"
-    }
-}
-
-
-stroke_model = joblib.load(Path(ROOT_DIR) / "models" / "stroke_model.pkl")
-heart_model = joblib.load(Path(ROOT_DIR) / "models" / "heart_model.pkl")
+# Load models
+stroke_model = joblib.load(MODEL_PATHS["stroke"]["model"])
+heart_model = joblib.load(MODEL_PATHS["heart"]["model"])
 
 def generate_shap_explanation(model, input_df, model_name, scaler=None, output_placeholder=None):
     """
@@ -67,38 +38,6 @@ def generate_shap_explanation(model, input_df, model_name, scaler=None, output_p
         Dictionary with explanation data or None if failed
     """
     plt.close("all")
-
-    # Feature name mappings for human-readable display
-    feature_name_map = {
-        "kidney": {
-            "age": "Age", "bp": "Blood Pressure", "sg": "Specific Gravity", 
-            "al": "Albumin", "su": "Sugar", "rbc": "Red Blood Cells",
-            "pc": "Pus Cells", "pcc": "Pus Cell Clumps", "ba": "Bacteria",
-            "bgr": "Blood Glucose Random", "bu": "Blood Urea", "sc": "Serum Creatinine",
-            "sod": "Sodium", "pot": "Potassium", "hemo": "Hemoglobin",
-            "pcv": "Packed Cell Volume", "wc": "White Blood Cells", "rc": "Red Blood Cell Count",
-            "htn": "Hypertension", "dm": "Diabetes Mellitus", "cad": "Coronary Artery Disease",
-            "appet": "Appetite", "pe": "Pedal Edema", "ane": "Anemia"
-        },
-        "heart": {
-            "age": "Age", "trestbps": "Resting Blood Pressure", "chol": "Cholesterol",
-            "thalach": "Max Heart Rate Achieved", "oldpeak": "ST Depression",
-            "sex_1": "Sex (Male)", "cp_1": "Chest Pain Type 1", "cp_2": "Chest Pain Type 2",
-            "cp_3": "Chest Pain Type 3", "fbs_1": "Fasting Blood Sugar > 120",
-            "restecg_1": "Resting ECG 1", "restecg_2": "Resting ECG 2",
-            "exang_1": "Exercise Induced Angina", "slope_1": "Slope of ST 1",
-            "slope_2": "Slope of ST 2", "ca_1": "Coronary Calcification 1",
-            "ca_2": "Coronary Calcification 2", "ca_3": "Coronary Calcification 3",
-            "thal_1": "Thalassemia Type 1", "thal_2": "Thalassemia Type 2",
-            "thal_3": "Thalassemia Type 3", "thal_4": "Thalassemia Type 4"
-        },
-        "diabetes": {
-            "Pregnancies": "Number of Pregnancies", "Glucose": "Glucose Level",
-            "BP": "Blood Pressure", "SkinThickness": "Skin Thickness",
-            "Insulin": "Insulin Level", "BMI": "Body Mass Index",
-            "DPF": "Diabetes Pedigree Function", "Age": "Age"
-        }
-    }
     
     try:
         # Determine model type and create appropriate explainer
@@ -134,8 +73,8 @@ def generate_shap_explanation(model, input_df, model_name, scaler=None, output_p
                 # Map feature names to human-readable versions
                 readable_names = []
                 for fname in feature_names:
-                    if model_name in feature_name_map and fname in feature_name_map[model_name]:
-                        readable_names.append(feature_name_map[model_name][fname])
+                    if model_name in FEATURE_NAME_MAP and fname in FEATURE_NAME_MAP[model_name]:
+                        readable_names.append(FEATURE_NAME_MAP[model_name][fname])
                     else:
                         readable_names.append(fname)
                 
@@ -196,8 +135,8 @@ def generate_shap_explanation(model, input_df, model_name, scaler=None, output_p
         feature_names = input_df.columns.tolist()
         readable_names = []
         for fname in feature_names:
-            if model_name in feature_name_map and fname in feature_name_map[model_name]:
-                readable_names.append(feature_name_map[model_name][fname])
+            if model_name in FEATURE_NAME_MAP and fname in FEATURE_NAME_MAP[model_name]:
+                readable_names.append(FEATURE_NAME_MAP[model_name][fname])
             else:
                 readable_names.append(fname)
         
@@ -241,46 +180,11 @@ def display_rag_report(disease, risk_score, patient_metrics):
         try:
             st.info("Generating audited clinical guidance from the medical knowledge base.")
 
-            # =================================================================
-            # REUSED SHAP FEATURE MAPPING ZONE
-            # =================================================================
-            feature_name_map = {
-                "kidney": {
-                    "age": "Age", "bp": "Blood Pressure", "sg": "Specific Gravity", 
-                    "al": "Albumin", "su": "Sugar", "rbc": "Red Blood Cells",
-                    "pc": "Pus Cells", "pcc": "Pus Cell Clumps", "ba": "Bacteria",
-                    "bgr": "Blood Glucose Random", "bu": "Blood Urea", "sc": "Serum Creatinine",
-                    "sod": "Sodium", "pot": "Potassium", "hemo": "Hemoglobin",
-                    "pcv": "Packed Cell Volume", "wc": "White Blood Cells", "rc": "Red Blood Cell Count",
-                    "htn": "Hypertension", "dm": "Diabetes Mellitus", "cad": "Coronary Artery Disease",
-                    "appet": "Appetite", "pe": "Pedal Edema", "ane": "Anemia"
-                },
-                "heart": {
-                    "age": "Age", "trestbps": "Resting Blood Pressure", "chol": "Cholesterol",
-                    "thalach": "Max Heart Rate Achieved", "oldpeak": "ST Depression",
-                    "sex_1": "Sex (Male)", "cp_1": "Chest Pain Type 1", "cp_2": "Chest Pain Type 2",
-                    "cp_3": "Chest Pain Type 3", "fbs_1": "Fasting Blood Sugar > 120",
-                    "restecg_1": "Resting ECG 1", "restecg_2": "Resting ECG 2",
-                    "exang_1": "Exercise Induced Angina", "slope_1": "Slope of ST 1",
-                    "slope_2": "Slope of ST 2", "ca_1": "Coronary Calcification 1",
-                    "ca_2": "Coronary Calcification 2", "ca_3": "Coronary Calcification 3",
-                    "thal_1": "Thalassemia Type 1", "thal_2": "Thalassemia Type 2",
-                    "thal_3": "Thalassemia Type 3", "thal_4": "Thalassemia Type 4"
-                },
-                "diabetes": {
-                    "Pregnancies": "Number of Pregnancies", "Glucose": "Glucose Level",
-                    "BP": "Blood Pressure", "SkinThickness": "Skin Thickness",
-                    "Insulin": "Insulin Level", "BMI": "Body Mass Index",
-                    "DPF": "Diabetes Pedigree Function", "Age": "Age"
-                },
-                "stroke": {}
-            }
-
             # Extract the specific map for the active disease category
             # Fallback to empty dict if the disease string has an unexpected format
-            active_disease_map = feature_name_map.get(disease.lower().strip(), {})
+            active_disease_map = FEATURE_NAME_MAP.get(disease.lower().strip(), {})
             
-            # Rebuild a clean metrics dictionary using your SHAP mappings
+            # Rebuild a clean metrics dictionary using SHAP mappings from config
             clean_patient_metrics = {}
             for raw_key, value in patient_metrics.items():
                 clean_key = active_disease_map.get(raw_key.lower().strip(), raw_key.replace('_', ' ').title())
@@ -395,16 +299,9 @@ st.markdown("""
 # --- SHARED PREDICTION FUNCTION ---
 def predict_risk(model_name, features):
     try:
-        # 1. Get the directory where main.py is located
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # 2. Go up one level to the root, then into 'models'
-        model_path = os.path.join(base_dir, "..", "models", f"{model_name}_model.pkl")
-        scaler_path = os.path.join(base_dir, "..", "models", f"{model_name}_scaler.pkl")
-        
-        # Load the files using the absolute paths
-        model = joblib.load(model_path)
-        scaler = joblib.load(scaler_path)
+        # Load model and scaler from config paths
+        model = joblib.load(MODEL_PATHS[model_name]["model"])
+        scaler = joblib.load(MODEL_PATHS[model_name]["scaler"])
         
         input_array = np.array(features).reshape(1, -1)
         
@@ -432,8 +329,8 @@ def predict_risk(model_name, features):
             
         return prediction, probability
     
-    except FileNotFoundError:
-        st.error(f"File Not Found: Looked in {model_path}. Check if the file exists there!")
+    except FileNotFoundError as e:
+        st.error(f"File Not Found: {e}. Check if the model files exist.")
         return None, None
     except Exception as e:
         st.error(f"Error: {e}")
@@ -574,13 +471,9 @@ elif selection == "Kidney Disease":
         input_df = pd.DataFrame([features], columns=column_names)
         
         # Load model for SHAP explanation
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.join(base_dir, "..", "models", "kidney_model.pkl")
-        scaler_path = os.path.join(base_dir, "..", "models", "kidney_scaler.pkl")
-        
         try:
-            kidney_model = joblib.load(model_path)
-            kidney_scaler = joblib.load(scaler_path)
+            kidney_model = joblib.load(MODEL_PATHS["kidney"]["model"])
+            kidney_scaler = joblib.load(MODEL_PATHS["kidney"]["scaler"])
             explanation_container = st.empty()
             shap_result = generate_shap_explanation(kidney_model, input_df, "kidney", scaler=kidney_scaler, output_placeholder=explanation_container)
             
@@ -679,7 +572,7 @@ elif selection == "Heart Disease":
         # This keeps 'features' raw for the PDF report
         features_for_model = list(features)
         # 2. Scale all 6 at once
-        heart_scaler = joblib.load(Path(ROOT_DIR) / "models" / "heart_scaler.pkl")
+        heart_scaler = joblib.load(MODEL_PATHS["heart"]["scaler"])
         # We need to pick indices [0, 1, 2, 3, 4, 22] 
         nums_indices = [0, 1, 2, 3, 4, 22]
         nums_to_scale = np.array([features[i] for i in nums_indices]).reshape(1, -1)
@@ -817,13 +710,9 @@ elif selection == "Diabetes":
         input_df = pd.DataFrame([inputs], columns=diabetes_feature_names)
         
         # Load model for SHAP explanation
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.join(base_dir, "..", "models", "diabetes_model.pkl")
-        scaler_path = os.path.join(base_dir, "..", "models", "diabetes_scaler.pkl")
-        
         try:
-            diabetes_model = joblib.load(model_path)
-            diabetes_scaler = joblib.load(scaler_path)
+            diabetes_model = joblib.load(MODEL_PATHS["diabetes"]["model"])
+            diabetes_scaler = joblib.load(MODEL_PATHS["diabetes"]["scaler"])
             explanation_container = st.empty()
             shap_result = generate_shap_explanation(diabetes_model, input_df, "diabetes", scaler=diabetes_scaler, output_placeholder=explanation_container)
             
@@ -913,16 +802,15 @@ elif selection == "Stroke":
         features[17] = medical_risk
 
         # 2. NOW convert to numpy array so it has the .flatten() method
-        scaler = joblib.load(Path(ROOT_DIR) / "models" / "stroke_scaler.pkl")
+        scaler = joblib.load(MODEL_PATHS["stroke"]["scaler"])
         features_array = np.array(features)
         features_scaled = scaler.transform(np.array(features).reshape(1, -1))
 
-
         res, prob = predict_risk("stroke", features_scaled)
         
-        # Applying your custom 0.55 threshold from the notebook
+        # Apply stroke-specific risk threshold from config
         audited_report = None
-        if prob >= 0.55: 
+        if prob >= RISK_THRESHOLDS["stroke"]: 
             result_text = f"High Stroke Risk(Risk Score: {prob:.2%})"
             st.error(f"Result: {result_text}")
             st.progress(prob)
