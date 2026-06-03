@@ -24,7 +24,7 @@ class MedicalRAGEngine:
         self.model = "llama-3.1-8b-instant"
         logger.info(f"MedicalRAGEngine initialized successfully using core model: {self.model}")
 
-    def _stream_and_collect(self, call_fn, stream_callback=None):
+    def _stream_and_collect(self, call_fn, stream_callback=None, status_updater=None, label: str = "Streaming:"):
         """
         Helper to call model API with best-effort streaming. Accepts a zero-arg callable
         that invokes the underlying SDK call (preferably with streaming enabled).
@@ -70,27 +70,30 @@ class MedicalRAGEngine:
                 # Last resort: try attr 'text'
                 text = getattr(resp, 'text', str(resp))
             if stream_callback and text:
-                try:
-                    stream_callback(text)
-                except Exception:
-                    logger.debug("stream_callback raised an exception in fallback.")
+                self._stream_text(text, status_updater=status_updater, stream_callback=stream_callback, label=label)
             return text or ""
 
-    def _stream_text(self, text: str, status_updater, label: str = "Streaming:"):
-        """Chunk a full text and push incremental updates to status_updater.
+    def _stream_text(self, text: str, status_updater=None, stream_callback=None, label: str = "Streaming:"):
+        """Chunk a full text and push incremental updates to status_updater or stream_callback.
 
         Used when SDK streaming is not available but the UI still expects
         incremental updates.
         """
-        if not status_updater or not text:
+        if not text:
             return
         chunk_size = 250
         for i in range(0, len(text), chunk_size):
             piece = text[i:i+chunk_size]
-            try:
-                status_updater.update(label=f"{label} {piece}", state="running")
-            except Exception:
-                pass
+            if stream_callback:
+                try:
+                    stream_callback(piece)
+                except Exception:
+                    logger.debug("stream_callback raised an exception during fallback streaming.")
+            if status_updater:
+                try:
+                    status_updater.update(label=f"{label} {piece}", state="running")
+                except Exception:
+                    pass
             time.sleep(0.02)
 
     def _parse_citations_from_stage1(self, stage1_output: str) -> list:
@@ -216,10 +219,11 @@ class MedicalRAGEngine:
         (Explain what the {risk_score * 100:.1f}% score means based *only* on thresholds found in the guidelines [CHUNK: X])
 
         #### 2. Metric Evaluation against Guidelines
-        (Cross-reference the raw features {patient_metrics} with explicit rules in the guidelines [CHUNK: X, Y, Z])
+        (Cross-reference the raw features {patient_metrics} with explicit rules in the guidelines [CHUNK: X, Y, Z]), if any specific metric does not directly correlate with any specific guideline recommendations in the provided text DO NOT mention it at all in the output. Focus only on synthesizing the information that is present in the guidelines with the patient's metrics to provide a cohesive clinical picture.)
+
 
         #### 3. Clinical Disclaimers / Missing Data
-        (List any patient metrics that were completely missing or unaddressed by the retrieved guidelines)
+        (Only list any critical clinical information that is missing from the patient's metrics but is mentioned in the guidelines as important for risk assessment). 
         """
 
         try:
@@ -239,7 +243,12 @@ class MedicalRAGEngine:
 
             # Prefer the provided stream_callback; otherwise stream to status_updater
             if stream_callback:
-                initial_explanation = self._stream_and_collect(_call_stage1, stream_callback=stream_callback)
+                initial_explanation = self._stream_and_collect(
+                    _call_stage1,
+                    stream_callback=stream_callback,
+                    status_updater=status_updater,
+                    label="🧠 Stage 1 (stream):"
+                )
             else:
                 def _stage1_cb(part: str):
                     if status_updater:
@@ -247,7 +256,12 @@ class MedicalRAGEngine:
                             status_updater.update(label=f"🧠 Stage 1 (stream): {part}", state="running")
                         except Exception:
                             pass
-                initial_explanation = self._stream_and_collect(_call_stage1, stream_callback=_stage1_cb)
+                initial_explanation = self._stream_and_collect(
+                    _call_stage1,
+                    stream_callback=_stage1_cb,
+                    status_updater=status_updater,
+                    label="🧠 Stage 1 (stream):"
+                )
             logger.info("Stage 1: Clinical explanation generated with citations.")
 
             # --- EXTRACT CITATIONS & FILTER CONTEXT ---
@@ -310,7 +324,12 @@ class MedicalRAGEngine:
                 )
 
             if stream_callback:
-                final_audited_report = self._stream_and_collect(_call_stage2, stream_callback=stream_callback)
+                final_audited_report = self._stream_and_collect(
+                    _call_stage2,
+                    stream_callback=stream_callback,
+                    status_updater=status_updater,
+                    label="🛡️ Stage 2 (stream):"
+                )
             else:
                 def _stage2_cb(part: str):
                     if status_updater:
@@ -318,7 +337,12 @@ class MedicalRAGEngine:
                             status_updater.update(label=f"🛡️ Stage 2 (stream): {part}", state="running")
                         except Exception:
                             pass
-                final_audited_report = self._stream_and_collect(_call_stage2, stream_callback=_stage2_cb)
+                final_audited_report = self._stream_and_collect(
+                    _call_stage2,
+                    stream_callback=_stage2_cb,
+                    status_updater=status_updater,
+                    label="🛡️ Stage 2 (stream):"
+                )
             logger.info("Stage 2: Clinical audit evaluation complete.")
 
             # --- STAGE 3: TELEMETRY EVALUATION LOGGING ---

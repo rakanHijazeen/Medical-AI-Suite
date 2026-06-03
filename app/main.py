@@ -172,41 +172,54 @@ def generate_shap_explanation(model, input_df, model_name, scaler=None, output_p
 
 
 def display_rag_report(disease, risk_score, patient_metrics):
-    """Generate and display RAG-audited clinical guidance using synchronized SHAP names."""
+    """Generate and display RAG-audited clinical guidance directly in the main view."""
     if not patient_metrics or risk_score is None:
         return None
 
-    with st.expander("🔎 Generate Clinical Audit (RAG)"):
+    # Use a container to define a visual boundary without the 'click-to-expand' behavior
+    with st.container(border=True):
+        st.subheader("📝 RAG-Audited Clinical Summary")
+        
         try:
-            st.info("Generating audited clinical guidance from the medical knowledge base.")
-
-            # Extract the specific map for the active disease category
-            # Fallback to empty dict if the disease string has an unexpected format
+            # 1. Prepare metrics
             active_disease_map = FEATURE_NAME_MAP.get(disease.lower().strip(), {})
-            
-            # Rebuild a clean metrics dictionary using SHAP mappings from config
-            clean_patient_metrics = {}
-            for raw_key, value in patient_metrics.items():
-                clean_key = active_disease_map.get(raw_key.lower().strip(), raw_key.replace('_', ' ').title())
-                clean_patient_metrics[clean_key] = value
+            clean_patient_metrics = {
+                active_disease_map.get(raw_key.lower().strip(), raw_key.replace('_', ' ').title()): value 
+                for raw_key, value in patient_metrics.items()
+            }
 
+            # 2. Prepare a placeholder for streamed text outside the status container
+            report_placeholder = st.empty()
+            report_text_chunks = []
+            report_placeholder.text_area("Live RAG stream", "Waiting for RAG stream...", height=300)
+
+            # 3. Use a status container for the engine steps
             with st.status("🔍 Initializing Medical RAG Pipeline...", expanded=True) as status:
-            # Pass the translated, human-readable metrics into your RAG engine
+                # 4. We pass a streaming callback that updates our placeholder
+                def streaming_callback(text_chunk):
+                    report_text_chunks.append(text_chunk)
+                    report_placeholder.text_area("Live RAG stream", "".join(report_text_chunks), height=300)
+
                 audited_report = generate_medical_audit(
                     disease=disease,
                     risk_score=float(risk_score),
                     patient_metrics=clean_patient_metrics,
-                    status_updater=status
+                    status_updater=status,
+                    stream_callback=streaming_callback # Pass your new callback here!
                 )
             
-            if audited_report:
-                st.markdown("### 📝 RAG-Audited Clinical Summary")
+            # Final touch: Ensure the result is shown cleanly after status closes
+            if audited_report and not audited_report.startswith("❌"):
+                st.success("✅ Audit Complete")
+                st.markdown("---")
                 st.write(audited_report)
                 return audited_report
+            else:
+                st.error("RAG audit failed to generate content.")
                 
-            st.warning("RAG generated no summary.")
         except Exception as exc:
-            st.error(f"RAG audit failed: {exc}")
+            st.error(f"RAG audit system error: {exc}")
+    
     return None
 
 
