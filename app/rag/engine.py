@@ -239,6 +239,7 @@ class MedicalRAGEngine:
                     messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
                     temperature=0.2,
                     max_tokens=1024,
+                    seed=42,
                     **kwargs
                 )
 
@@ -270,6 +271,8 @@ class MedicalRAGEngine:
             citations = self._parse_citations_from_stage1(initial_explanation or "")
             logger.info("Filtering context chunks based on Stage 1 citations...")
             filtered_context_chunks = self._filter_context_by_citations(context_chunks, citations)
+            # Sort the filtered list alphabetically before building the string
+            filtered_context_chunks.sort()
             filtered_context = "\n\n".join([f"- {chunk}" for chunk in filtered_context_chunks])
 
             # =====================================================================
@@ -290,10 +293,22 @@ class MedicalRAGEngine:
                 "CRITICAL STRUCTURAL RULES:\n"
                 "1. Preserve all Markdown formatting elements (e.g., headers like '###', bullet points, bold text) exactly as they appear in the input. Do not leave trailing or empty markdown bullets.\n"
                 "2. Do not delete an entire paragraph if only one sentence contains an unverified claim; isolate and remove or correct only the offending sentence.\n"
-                "3. Output ONLY the finalized, safely stripped version of the assessment. Do not add introductions, explanations, notes, or conclusions."
-            )
+                "3. DO NOT COPY THE PROMPT HEADINGS. DO NOT echo back the 'SYSTEM VERIFIED TRUTHS' or 'FILTERED SOURCE MEDICAL TRUTH' sections.\n"
+                "4. OUTPUT ONLY the cleaned version of the text found under '### GENERATED ASSESSMENT TO AUDIT'. Absolutely no intro, no metadata, no summary labels."
+            )            
 
             guard_user_prompt = f"""
+                ### INSTRUCTIONS
+                Review every assertion, metric range, and recommendation in the [GENERATED ASSESSMENT]. 
+                Cross-reference it with both the SYSTEM VERIFIED TRUTHS and the FILTERED SOURCE MEDICAL TRUTH. 
+
+                - If a claim about a risk tier matches the 3-tier framework scale above, RETAIN IT.
+                - If a claim about a lab metric matches the filtered reference values, RETAIN IT.
+                - If a sentence makes an unverified specific clinical claim (e.g., an unreferenced diagnostic cutoff or a specific drug prescription) that appears in neither source, STRIP OR REPHRASE that specific sentence to render it safe and generalized.
+                - Maintain the original document's markdown layout structure perfectly.
+                
+                Output ONLY the finalized, safely stripped text. No explanations, no pleasantries.
+
                 ### SYSTEM VERIFIED TRUTHS (DO NOT DELETE CLAIMS BASED ON THESE)
                 1. RISK ASSESSMENT FRAMEWORK EVALUATION SCALE:
                 - Risk Score Range 0.00 to 0.30: LOW RISK. Focus on standard lifestyle preventative measures.
@@ -305,25 +320,15 @@ class MedicalRAGEngine:
 
                 ### GENERATED ASSESSMENT TO AUDIT
                 {initial_explanation}
-
-                ### AUDIT EXECUTION DIRECTIVE
-                Review every assertion, metric range, and recommendation in the [GENERATED ASSESSMENT]. 
-                Cross-reference it with both the SYSTEM VERIFIED TRUTHS and the FILTERED SOURCE MEDICAL TRUTH. 
-
-                - If a claim about a risk tier matches the 3-tier framework scale above, RETAIN IT.
-                - If a claim about a lab metric matches the filtered reference values, RETAIN IT.
-                - If a sentence makes an unverified specific clinical claim (e.g., an unreferenced diagnostic cutoff or a specific drug prescription) that appears in neither source, STRIP OR REPHRASE that specific sentence to render it safe and generalized.
-                - Maintain the original document's markdown layout structure perfectly.
-                
-                Output ONLY the finalized, safely stripped text. No explanations, no pleasantries.
                 """
 
             def _call_stage2(**kwargs):
                 return self.client.chat.completions.create(
                     model=self.model,
                     messages=[{"role": "system", "content": guard_system_prompt}, {"role": "user", "content": guard_user_prompt}],
-                    temperature=0.1,
+                    temperature=0.0,
                     max_tokens=1024,
+                    seed=42,
                     **kwargs
                 )
 
