@@ -188,7 +188,8 @@ class MedicalRAGEngine:
             "- Do NOT create a robotic list of every single metric saying 'not mentioned'. If a metric is not mentioned in the text, do not list it as a separate bullet point.\n"
             "- Instead, focus heavily on the data that IS present in the reference text (e.g., Albuminuria, Hemoglobin, CKD progression, RASi treatment).\n"
             "- Synthesize the patient's overall status. For example, note how their Albumin level of 1 or Hemoglobin level relates to the broad CKD outcomes and severities discussed in the guidelines.\n"
-            "- Write in a narrative, professional medical tone. Ensure every external claim is tagged with its source chunk."
+            "- Write in a narrative, professional medical tone for a peer-reviewed clinical audience. Avoid jargon that obscures the clinical reasoning. Ensure every external claim is tagged with its source chunk."
+            "- If you cannot find a supporting chunk for a claim, do not make a claim. Do not invent [CHUNK: X] tags. If the reference is not in the text, omit the claim entirely."
         )
 
         user_prompt = f"""
@@ -279,19 +280,21 @@ class MedicalRAGEngine:
                 status_updater.update(label="🛡️ Stage 2: Adversarial Auditor fact-checking for hallucinations...", state="running")
 
             guard_system_prompt = (
-                "You are a adversarial Medical AI Fact-Checker. Your sole function is to catch hallucinations.\n\n"
+                "You are an adversarial Medical AI Fact-Checker and Editor. Your sole function is to catch and eliminate hallucinations while preserving structural integrity.\n\n"
                 "Compare the [GENERATED ASSESSMENT] against the [FILTERED SOURCE MEDICAL TRUTH].\n"
-                "Identify every medical claim, benchmark, drug, or numerical range mentioned in the assessment.\n\n"
+                "Identify every medical claim, benchmark, metric range, or clinical guideline mentioned.\n\n"
                 "CRITICAL TEST:\n"
-                "Is that exact claim or benchmark supported word-for-word or conceptually by the [FILTERED SOURCE MEDICAL TRUTH]?\n"
-                "- If YES: Retain the sentence completely.\n"
-                "- If NO / partial match: You must completely delete the sentence or paragraph.\n\n"
-                "Output ONLY the finalized, safely stripped version of the assessment. Do not add introductions or conclusions."
+                "Is the specific clinical claim or numeric benchmark supported conceptually or word-for-word by either the SYSTEM VERIFIED TRUTHS or the FILTERED SOURCE MEDICAL TRUTH?\n"
+                "- If YES: Retain the sentence exactly as written.\n"
+                "- If NO / UNVERIFIED: You must rewrite or edit the sentence to completely remove the unverified claim, or delete only the non-compliant sentence.\n\n"
+                "CRITICAL STRUCTURAL RULES:\n"
+                "1. Preserve all Markdown formatting elements (e.g., headers like '###', bullet points, bold text) exactly as they appear in the input. Do not leave trailing or empty markdown bullets.\n"
+                "2. Do not delete an entire paragraph if only one sentence contains an unverified claim; isolate and remove or correct only the offending sentence.\n"
+                "3. Output ONLY the finalized, safely stripped version of the assessment. Do not add introductions, explanations, notes, or conclusions."
             )
 
             guard_user_prompt = f"""
                 ### SYSTEM VERIFIED TRUTHS (DO NOT DELETE CLAIMS BASED ON THESE)
-
                 1. RISK ASSESSMENT FRAMEWORK EVALUATION SCALE:
                 - Risk Score Range 0.00 to 0.30: LOW RISK. Focus on standard lifestyle preventative measures.
                 - Risk Score Range 0.31 to 0.70: MODERATE RISK. Requires clinical review, metabolic monitoring, and primary prevention strategies.
@@ -309,7 +312,8 @@ class MedicalRAGEngine:
 
                 - If a claim about a risk tier matches the 3-tier framework scale above, RETAIN IT.
                 - If a claim about a lab metric matches the filtered reference values, RETAIN IT.
-                - If any clinical claim is completely missing from both references, delete that sentence or paragraph entirely.
+                - If a sentence makes an unverified specific clinical claim (e.g., an unreferenced diagnostic cutoff or a specific drug prescription) that appears in neither source, STRIP OR REPHRASE that specific sentence to render it safe and generalized.
+                - Maintain the original document's markdown layout structure perfectly.
                 
                 Output ONLY the finalized, safely stripped text. No explanations, no pleasantries.
                 """
