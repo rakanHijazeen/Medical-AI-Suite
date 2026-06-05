@@ -1,13 +1,23 @@
 import os
 import io
 import time
+import logging
 import groq
 from groq import Groq
 from dotenv import load_dotenv
 from app.rag.retriever import MedicalRAGRetriever
 from pypdf import PdfReader
+from utils.logger import logger
 
 load_dotenv()
+
+LOG_PATH = os.path.join("logs", "chat.log")
+
+os.makedirs("logs", exist_ok=True)
+
+chat_file_handler = logging.FileHandler(LOG_PATH)
+chat_file_handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+logger.addHandler(chat_file_handler)
 
 class MedicalChatEngine:
     def __init__(self):
@@ -16,7 +26,8 @@ class MedicalChatEngine:
         
         self.primary_model = "llama-3.1-8b-instant" # for response generation
         self.helper_model = "llama-3.3-70b-versatile"    # for lightweight query rewriting
-
+        logger.info(f"MedicalChatEngine initialized successfully | Orchestrator: {self.helper_model} -> {self.primary_model}")
+    
     def _optimize_query(self, history, user_input):
         """
         Rewrites the user query to be standalone by considering 
@@ -25,6 +36,8 @@ class MedicalChatEngine:
         # If no history, just return the input
         if not history:
             return user_input
+        
+        logger.info(f"Optimizing multi-turn context payload using {self.helper_model}...")
 
         context_string = "\n".join([f"{m['role']}: {m['content']}" for m in history[-3:]])
         
@@ -44,12 +57,17 @@ class MedicalChatEngine:
             temperature=0.0
         )
         # time.sleep(1)  # Add a small delay to avoid rate limiting
-        return response.choices[0].message.content.strip()
-    
+        optimized_query = response.choices[0].message.content.strip()
+        logger.info(f"Optimized search query generated | Query: '{optimized_query}'")
+        return optimized_query
+
     def generate_response(self, user_input, chat_history, disease_category, local_pdf_text=None):
         """
         Orchestrates retrieval and generates a streamed response.
         """
+
+        logger.info(f"Incoming conversational RAG prompt received | History Depth: {len(chat_history)} turns")
+
         def safe_groq_call(self, payload):
             for attempt in range(3): # Try 3 times
                 try:
@@ -64,12 +82,15 @@ class MedicalChatEngine:
 
         # 2. Retrieve Global Context (Guidelines)
         # Using your existing retrieve_context method from retriever.py
+        logger.info(f"Executing pgvector similarity search against {disease_category} guidelines...")
         global_chunks = self.retriever.retrieve_context(
             disease_category=disease_category, 
             query_text=search_query, 
             top_k=3
         )
         global_context = "\n\n".join(global_chunks)
+
+        logger.info(f"Vector search complete | Context payload size: {len(global_context)} characters")
 
         # 3. Construct System Prompt
         system_prompt = f"""
@@ -98,6 +119,7 @@ class MedicalChatEngine:
         messages.append({"role": "user", "content": user_input})
 
         # 5. Stream Completion
+        logger.info(f"Assembling context payloads and initiating live RAG stream via {self.primary_model}...")
         completion = self.client.chat.completions.create(
             model=self.primary_model, # Use the more powerful model (llama-3.1-8b-instant)
             messages=messages,
@@ -108,6 +130,9 @@ class MedicalChatEngine:
         for chunk in completion:
             if chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
+
+        # Log completion of the stream
+        logger.info("Conversational RAG response stream completed successfully.")
 
 class PDFTextExtractor:
     @staticmethod
@@ -129,9 +154,10 @@ class PDFTextExtractor:
             
             # 3. Join blocks into a single structured string
             full_report_text = "\n\n".join(extracted_text_chunks)
+            logger.info(f"PDF extraction complete | Pages processed: {len(reader.pages)}")
             return full_report_text.strip()
             
         except Exception as e:
             # Safe clinical fallback preventing app crashes if an invalid file is dropped
-            print(f"❌ PDF Text Extraction Error: {e}")
+            logger.error(f"PDF Text Extraction Error: {str(e)}")
             return ""                
