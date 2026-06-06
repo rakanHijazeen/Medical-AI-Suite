@@ -139,56 +139,217 @@ While standard ML models excel at calculating risk percentages from raw clinical
 
 ## ▶️ Installation & Setup
 
-### Prerequisites
+This project uses **Docker and Dev Containers** for a fully containerized development environment. We recommend the VS Code Dev Container approach for the smoothest setup experience.
 
-- Docker & Docker Compose installed locally
-- Python 3.11 environment configuration
-- Valid Groq API key credentials
+### Option 1: VS Code Dev Container (⭐ Recommended)
 
-### Execution Steps
+The easiest way to get started with full IDE integration, debugging, and all dependencies pre-configured.
 
-1. Clone the project tree:
+#### Prerequisites
+
+- **Docker Desktop** (or Docker Engine on Linux)
+  - [Download Docker Desktop](https://www.docker.com/products/docker-desktop)
+- **VS Code** with Remote - Containers extension
+  - [Install Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+- **Groq API Key**
+  - Get it from [https://console.groq.com/](https://console.groq.com/)
+
+#### Quick Start (3 Steps)
+
+1. **Clone and navigate to the project:**
 
    ```bash
-   git clone [https://github.com/rakanHijazeen/Medical-AI-Suite.git](https://github.com/rakanHijazeen/Medical-AI-Suite.git)
+   git clone https://github.com/rakanHijazeen/Medical-AI-Suite.git
    cd Medical-AI-Suite
    ```
 
-   Build and launch the database container:
+2. **Create environment configuration:**
 
    ```bash
-   docker-compose up -d
+   cp .devcontainer/.env.example .env
    ```
 
-   Initialize python dependencies:
+   Edit `.env` and add your credentials:
+
+   ```env
+   GROQ_API_KEY=your_groq_api_key_here
+   DB_HOST=postgres
+   DB_PORT=5432
+   DB_NAME=medical_ai
+   DB_USER=postgres
+   DB_PASSWORD=postgres_dev_password
+   ```
+
+3. **Open in VS Code and reopen in container:**
+   ```bash
+   code .
+   ```
+
+   - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
+   - Search for: **Remote-Containers: Reopen in Container**
+   - Wait for container build (5-10 minutes on first run)
+
+#### What Gets Installed
+
+✅ Python 3.11 runtime  
+✅ All dependencies from `requirements.txt`  
+✅ PostgreSQL 16 database  
+✅ Streamlit (port 8501)  
+✅ Jupyter Lab (port 8888)  
+✅ Development tools (pytest, black, isort, pylint, mypy)  
+✅ 12+ VS Code extensions  
+✅ Pre-configured debugging
+
+#### Running Services
+
+Once in the dev container:
+
+```bash
+# Start Streamlit app
+make streamlit
+# Access: http://localhost:8501
+
+# Start Jupyter Lab
+make jupyter
+# Access: http://localhost:8888
+
+# Run tests
+make test
+
+# Format code
+make format
+
+# View all commands
+make help
+```
+
+For detailed instructions, see [`.devcontainer/README.md`](.devcontainer/README.md)
+
+---
+
+### Option 2: Local Setup (Manual)
+
+If you prefer to set up locally without containers:
+
+#### Prerequisites
+
+- **Python 3.11+**
+- **PostgreSQL 12+** installed and running locally
+- **Groq API Key**
+
+#### Installation Steps
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone https://github.com/rakanHijazeen/Medical-AI-Suite.git
+   cd Medical-AI-Suite
+   ```
+
+2. **Create Python virtual environment:**
+
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies:**
 
    ```bash
    pip install -r requirements.txt
    ```
 
-   Set up your local environment configuration:
-   Create a .env file in the root directory and configure your credentials (use placeholder patterns below as a template reference):
+4. **Configure environment:**
 
-   ## Code snippet
+   ```bash
+   cp .devcontainer/.env.example .env
+   ```
 
-   GROQ_API_KEY=your_actual_groq_api_key_here
-   DATABASE_URL=postgresql://postgres:password@localhost:5432/medical_rag
+   Update `.env` with your PostgreSQL credentials and Groq API key:
 
-   ***
+   ```env
+   GROQ_API_KEY=your_groq_api_key_here
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_NAME=medical_ai
+   DB_USER=your_postgres_user
+   DB_PASSWORD=your_postgres_password
+   ```
 
-   Populate the RAG Vector Knowledge Base:
-   Run the database initialization script to parse local medical guideline PDFs, generate the dense vector embeddings, and seed your local Docker database container:
+5. **Initialize database:**
 
+   ```bash
+   psql -U postgres -d medical_ai -f .devcontainer/init-db.sql
+   ```
+
+6. **Populate the RAG Knowledge Base:**
    ```bash
    python knowledge_base/init_db.py
    ```
 
-   ▶️ Usage
-   Start the platform web-app interface:
+#### Running the Application
 
-   ```bash
-   streamlit run app/main.py
-   ```
+```bash
+# Start Streamlit app
+streamlit run app/main.py
+
+# The app will open at http://localhost:8501
+```
+
+---
+
+### Environment Variables Reference
+
+| Variable       | Required | Default      | Purpose                        |
+| -------------- | -------- | ------------ | ------------------------------ |
+| `GROQ_API_KEY` | ✅ Yes   | -            | Groq API key for LLM inference |
+| `DB_HOST`      | ✅ Yes   | `postgres`   | Database hostname              |
+| `DB_PORT`      | ✅ Yes   | `5432`       | Database port                  |
+| `DB_NAME`      | ✅ Yes   | `medical_ai` | Database name                  |
+| `DB_USER`      | ✅ Yes   | `postgres`   | Database user                  |
+| `DB_PASSWORD`  | ✅ Yes   | -            | Database password              |
+| `LOG_LEVEL`    | ❌ No    | `INFO`       | Logging verbosity              |
+
+See `.devcontainer/.env.example` for all available options.
+
+---
+
+### Troubleshooting
+
+**Dev Container won't build?**
+
+```bash
+# Rebuild from scratch
+docker system prune -a
+# Then: Remote-Containers: Rebuild Container in VS Code
+```
+
+**PostgreSQL connection fails?**
+
+```bash
+# Check container logs
+docker logs medical_ai_postgres
+
+# Or reset and restart
+docker-compose -f .devcontainer/docker-compose.yml down -v
+docker-compose -f .devcontainer/docker-compose.yml up -d
+```
+
+**Port already in use?**
+Edit `docker-compose.yml` or `.env` to use different ports. See [`.devcontainer/README.md`](.devcontainer/README.md) for details.
+
+For more help, see:
+
+- [`.devcontainer/README.md`](.devcontainer/README.md) - Complete dev container guide
+- [`.devcontainer/ARCHITECTURE.md`](.devcontainer/ARCHITECTURE.md) - Technical details
+- [`.devcontainer/SETUP_SUMMARY.md`](.devcontainer/SETUP_SUMMARY.md) - Quick reference
+
+  ▶️ Usage
+  Start the platform web-app interface:
+
+  ```bash
+  streamlit run app/main.py
+  ```
 
 Select an assessment workspace via the navigation layout (Kidney, Heart, Diabetes, or Stroke).
 

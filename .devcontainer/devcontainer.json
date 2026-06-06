@@ -1,0 +1,90 @@
+{
+  "name": "Medical AI Suite",
+  "description": "Development container for Medical AI Suite - Clinical Decision Support Platform",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy",
+        "ms-jupyter.jupyter",
+        "ms-jupyter.vscode-jupyter-cell-markers",
+        "ms-vscode.makefile-tools",
+        "charliermarsh.ruff",
+        "ms-vscode-remote.remote-containers",
+        "GitHub.Copilot",
+        "ms-azuretools.vscode-docker",
+        "eamodio.gitlens",
+        "ms-python.black-formatter",
+        "ms-python.isort"
+      ],
+      "settings": {
+        "[python]": {
+          "defaultInterpreterPath": "/usr/local/bin/python",
+          "linting.enabled": true,
+          "linting.pylintEnabled": false,
+          "formatting.provider": "black",
+          "formatting.blackPath": "/usr/local/bin/black"
+        },
+        "python.analysis.typeCheckingMode": "basic",
+        "python.analysis.extraPaths": ["/workspace"],
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestPath": "/usr/local/bin/pytest",
+        "[json]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "jupyter.runStartupCommands": ["%load_ext autoreload", "%autoreload 2"]
+      }
+    }
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  "containerEnv": {
+    "PYTHONUNBUFFERED": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONPATH": "/workspace"
+  },
+
+  "remoteEnv": {
+    "DB_HOST": "postgres",
+    "DB_PORT": "5432",
+    "DB_NAME": "medical_ai",
+    "DB_USER": "postgres",
+    "DB_PASSWORD": "postgres_dev_password"
+  },
+
+  "postCreateCommand": "bash .devcontainer/postCreateCommand.sh",
+
+  "postStartCommand": "pip install -r requirements.txt && pip install pytest jupyter black isort",
+
+  "forwardPorts": [8501, 5432, 5433],
+  "portsAttributes": {
+    "8501": {
+      "label": "Streamlit App",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "5433": {
+      "label": "PostgreSQL Alt Port",
+      "onAutoForward": "silent"
+    }
+  },
+
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/root/.ssh,readonly"
+  ],
+
+  "remoteUser": "root",
+  "privilegedMode": false
+}

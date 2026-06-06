@@ -1,0 +1,94 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    container_name: medical_ai_dev
+    volumes:
+      - ..:/workspace
+      - /workspace/.venv:/workspace/.venv
+      - /workspace/__pycache__:/workspace/__pycache__
+    ports:
+      - "8501:8501" # Streamlit
+      - "8888:8888" # Jupyter
+      - "5433:5432" # PostgreSQL (host port 5433 -> container port 5432)
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONPATH=/workspace
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=medical_ai
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres_dev_password
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - medical_ai_network
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: medical_ai_postgres
+    environment:
+      POSTGRES_DB: medical_ai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./.devcontainer/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - medical_ai_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command:
+      - "postgres"
+      - "-c"
+      - "log_statement=all"
+
+  jupyter:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    container_name: medical_ai_jupyter
+    volumes:
+      - ..:/workspace
+      - jupyter_data:/root/.jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/workspace
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=medical_ai
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres_dev_password
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - medical_ai_network
+    command: jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''
+
+volumes:
+  postgres_data:
+    driver: local
+  jupyter_data:
+    driver: local
+
+networks:
+  medical_ai_network:
+    driver: bridge

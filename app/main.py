@@ -26,44 +26,605 @@ st.set_page_config(page_title="Medical AI Suite", page_icon="🩺", layout="wide
 
 st.markdown("""
     <style>
-            
-    /* Change background color */
+    :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, sans-serif;
+    }
+
     .stApp {
-        background-color: #f8f9fa;
+        background: radial-gradient(circle at top left, rgba(14,165,233,0.18), transparent 28%),
+                    radial-gradient(circle at bottom right, rgba(168,85,247,0.18), transparent 25%),
+                    linear-gradient(180deg, #0b1121 0%, #0f172a 100%);
+        color: #e2e8f0;
+        min-height: 100vh;
     }
-    /* Make cards for the input sections */
-    div.stNumberInput, div.stSelectbox, div.stSlider {
-        background-color: #ffffff;
-        padding: 15px;
-        border-radius: 10px;
-        border: 1px solid #e0e0e0;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
+
+    .block-container {
+        background: rgba(15,23,42,0.92);
+        border: 1px solid rgba(59,130,246,0.16);
+        box-shadow: 0 20px 80px rgba(0, 0, 0, 0.35);
+        border-radius: 24px;
+        padding: 28px 32px;
     }
-    /* Style the buttons to look more 'Actionable' */
-    .stButton>button {
-        background-color: #007bff;
-        color: white;
-        font-weight: bold;
-        border-radius: 20px;
+
+    .stHeader, .css-1v3fvcr, .css-1lsmgbg {
+        background: transparent;
+    }
+
+    .stSidebar {
+        background: rgba(15, 23, 42, 0.98);
+        border-right: 1px solid rgba(59,130,246,0.14);
+        box-shadow: inset -4px 0 30px rgba(0,0,0,0.15);
+    }
+
+    .stSidebar, .stSidebar * {
+        color: #e2e8f0 !important;
+    }
+
+    .stSidebar input,
+    .stSidebar select,
+    .stSidebar textarea,
+    .stSidebar button {
+        color: #e2e8f0 !important;
+        background: rgba(15,23,42,0.95) !important;
+        border-color: rgba(148,163,184,0.22) !important;
+    }
+
+    .css-1d391kg, .css-1d391kg .css-1v3fvcr {
+        color: #e2e8f0;
+    }
+
+    .stSidebar .stButton>button {
+        background: linear-gradient(135deg, #0ea5e9 0%, #818cf8 100%);
+        color: #f8fafc;
         border: none;
-        transition: 0.3s;
+        border-radius: 9999px;
+        padding: 0.95rem 1.2rem;
+        font-weight: 700;
+        box-shadow: 0 18px 35px rgba(14,165,233,0.18);
     }
+
+    .stSidebar .stRadio>div {
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 18px;
+        padding: 1rem;
+    }
+
+    .block-container label,
+    .block-container input,
+    .block-container select,
+    .block-container textarea,
+    .block-container div,
+    .block-container span {
+        color: #e2e8f0 !important;
+    }
+
+    .block-container input,
+    .block-container select,
+    .block-container textarea,
+    .block-container .stSelectbox,
+    .block-container .stNumberInput {
+        background: rgba(15,23,42,0.92) !important;
+        border: 1px solid rgba(148,163,184,0.18) !important;
+    }
+
+    .stButton>button {
+        background: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%);
+        border: none;
+        color: #ffffff;
+        font-weight: 700;
+        border-radius: 14px;
+        padding: 0.85rem 1.2rem;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+        box-shadow: 0 14px 30px rgba(56,189,248,0.18);
+    }
+
     .stButton>button:hover {
-        background-color: #0056b3;
-        transform: scale(1.02);
+        transform: translateY(-1px);
+        box-shadow: 0 18px 40px rgba(56,189,248,0.28);
+        filter: brightness(1.05);
+    }
+
+    .stButton>button:focus-visible {
+        outline: 2px solid rgba(56,189,248,0.65);
+        outline-offset: 2px;
+    }
+
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4 {
+        color: #f8fafc;
+    }
+
+    .stMarkdown p,
+    .stMarkdown div,
+    .stMarkdown span,
+    .stText,
+    .css-1d391kg {
+        color: #cbd5e1;
+    }
+
+    .css-10trblm {
+        background: rgba(15, 23, 42, 0.82) !important;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(14,165,233,0.12);
+        border: 1px solid rgba(14,165,233,0.4);
+        color: #a5f3fc;
+        padding: 8px 14px;
+        border-radius: 9999px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        backdrop-filter: blur(10px);
+    }
+
+    .status-dot {
+        height: 10px;
+        width: 10px;
+        background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+        border-radius: 50%;
+        display: inline-block;
+        box-shadow: 0 0 14px rgba(14,165,233,0.8);
+    }
+
+    .chat-bubble-user {
+        background: linear-gradient(180deg, rgba(15,23,42,0.96), rgba(30,41,59,0.9));
+        border-radius: 24px 24px 6px 24px;
+        padding: 16px 18px;
+        margin: 12px 0;
+        max-width: 84%;
+        margin-left: auto;
+        color: #e2e8f0;
+        border: 1px solid rgba(71,85,105,0.4);
+        box-shadow: 0 16px 40px rgba(15,23,42,0.35);
+    }
+
+    .chat-bubble-ai {
+        background: linear-gradient(180deg, rgba(30,41,59,0.96), rgba(15,23,42,0.9));
+        border-radius: 24px 24px 24px 6px;
+        padding: 16px 18px;
+        margin: 12px 0;
+        max-width: 84%;
+        color: #e2e8f0;
+        border: 1px solid rgba(51,65,85,0.45);
+        box-shadow: 0 16px 40px rgba(15,23,42,0.35);
+    }
+
+    .citation-pill {
+        display: inline-block;
+        background: rgba(2, 132, 199, 0.14);
+        color: #bae6fd;
+        font-size: 0.78rem;
+        padding: 5px 8px;
+        border-radius: 9999px;
+        margin-left: 4px;
+        font-weight: 700;
+        border: 1px solid rgba(2,132,199,0.28);
+    }
+    /* Ensure form controls and dropdowns follow dark theme */
+    select, option, input, textarea, .stSelectbox, .stTextInput, .stNumberInput, .stMultiSelect {
+        background: rgba(15,23,42,0.96) !important;
+        color: #e2e8f0 !important;
+        border: 1px solid rgba(148,163,184,0.14) !important;
+    }
+
+    /* Streamlit specific chat input and dropdown popups */
+    div[data-testid="stChatInput"], div[data-testid="stChatInput"] textarea, div[data-testid="stChatInput"] > div {
+        background: rgba(15,23,42,0.98) !important;
+        color: #e2e8f0 !important;
+        border: 1px solid rgba(148,163,184,0.12) !important;
+    }
+
+    /* Role-based overrides for many dropdown renderers */
+    [role="listbox"], [role="option"], ul[role="listbox"], li[role="option"], .rc-virtual-list {
+        background: rgba(15,23,42,0.96) !important;
+        color: #e2e8f0 !important;
+    }
+
+    /* Placeholder color for inputs */
+    ::placeholder { color: #94a3b8 !important; }
+
+    /* Target Streamlit BaseWeb select component and all descendants */
+    [data-baseweb="select"],
+    [data-baseweb="select"] * {
+        background: rgba(15,23,42,0.96) !important;
+        color: #e2e8f0 !important;
+    }
+
+    /* Combobox input specifically */
+    input[role="combobox"],
+    input[role="combobox"]:focus {
+        background: rgba(15,23,42,0.96) !important;
+        color: #e2e8f0 !important;
+        border: 1px solid rgba(148,163,184,0.14) !important;
+    }
+
+    /* Listbox popup when opened */
+    [role="listbox"], [role="listbox"] * {
+        background: rgba(15,23,42,0.96) !important;
+        color: #e2e8f0 !important;
+    }
+
+    /* Option items in listbox */
+    [role="option"] {
+        background: rgba(15,23,42,0.96) !important;
+        color: #e2e8f0 !important;
+    }
+    [role="option"]:hover {
+        background: rgba(56,189,248,0.12) !important;
+        color: #e2e8f0 !important;
+    }
+
+    /* Specific overrides for chat input textarea and BaseWeb textareas */
+    [data-baseweb="textarea"],
+    [data-baseweb="base-input"],
+    textarea[data-testid="stChatInputTextArea"] {
+        background: rgba(15,23,42,0.96) !important;
+        color: #e2e8f0 !important;
+        border: 1px solid rgba(148,163,184,0.12) !important;
+    }
+
+    textarea[data-testid="stChatInputTextArea"]::placeholder,
+    [data-baseweb="textarea"]::placeholder {
+        color: #94a3b8 !important;
+    }
+
+    /* Force dark on entire chat input container and all children */
+    div[data-testid="stChatInput"],
+    div[data-testid="stChatInput"] * {
+        background: rgba(15,23,42,0.96) !important;
+        color: #e2e8f0 !important;
+    }
+
+    /* Ensure the textarea text input is dark and readable */
+    div[data-baseweb="textarea"] textarea,
+    textarea {
+        background: rgba(15,23,42,0.96) !important;
+        color: #e2e8f0 !important;
+        caret-color: #0ea5e9 !important;
+    }
+
+    /* Force dark on outer chat input container wrappers */
+    .stBottom,
+    .stElementContainer,
+    .stVerticalBlock,
+    div[data-testid="stBottomBlockContainer"],
+    div[data-testid="stVerticalBlock"],
+    div[data-testid="stElementContainer"] {
+        background: rgba(15,23,42,0.96) !important;
+    }
+
+    /* Chat input field - fix border edges */
+    div[data-testid="stChatInput"] {
+        border: 1px solid rgba(56,189,248,0.25) !important;
+        border-radius: 12px !important;
+        background: rgba(20,28,50,0.8) !important;
+        box-shadow: inset 0 0 0 1px rgba(56,189,248,0.08) !important;
+    }
+
+    /* Sidebar input fields - remove white backgrounds */
+    .stSidebar input[type="text"],
+    .stSidebar .stTextInput input,
+    .stSidebar div[data-baseweb="input"] input,
+    .stSidebar input {
+        background: rgba(20,28,50,0.8) !important;
+        color: #e2e8f0 !important;
+        border: 1px solid rgba(148,163,184,0.16) !important;
+        border-radius: 8px !important;
+    }
+
+    .stSidebar div[data-baseweb="input"] {
+        background: rgba(20,28,50,0.8) !important;
+        border: 1px solid rgba(148,163,184,0.16) !important;
+    }
+
+    /* Sidebar select field backgrounds */
+    .stSidebar .stSelectbox,
+    .stSidebar [data-baseweb="select"] {
+        background: rgba(20,28,50,0.8) !important;
+        border: 1px solid rgba(148,163,184,0.16) !important;
     }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
+
+# Load models
+stroke_model = joblib.load(MODEL_PATHS["stroke"]["model"])
+heart_model = joblib.load(MODEL_PATHS["heart"]["model"])
+
+def generate_shap_explanation(model, input_df, model_name, scaler=None, output_placeholder=None):
+    """
+    Generate SHAP explanations for RandomForest models only.
+    
+    Args:
+        model: The trained ML model
+        input_df: DataFrame with features for a single prediction
+        model_name: Name of the model (kidney, heart, diabetes, stroke)
+        scaler: Optional scaler used for the model input
+        output_placeholder: Optional Streamlit container to render explanations
+    
+    Returns:
+        Dictionary with explanation data or None if failed
+    """
+    plt.close("all")
+    
+    try:
+        # Determine model type and create appropriate explainer
+        model_type = type(model).__name__
+        if "RandomForest" not in model_type:
+            st.warning("SHAP explanations are currently supported only for RandomForest models.")
+            return None
+
+        if scaler is not None:
+            scaled_array = scaler.transform(input_df.values)
+            input_df = pd.DataFrame(scaled_array, columns=input_df.columns).astype(float)
+
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(input_df, check_additivity=False)
+        if isinstance(shap_values, list):
+            shap_values = shap_values[1]
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            # Handle SHAP versions that return shape (1, n_features, n_classes)
+            shap_values = shap_values[0, :, 1] if shap_values.shape[0] == 1 else shap_values[:, :, 1]
+
+        # Render explanation if container provided
+        if output_placeholder is not None:
+            with output_placeholder:
+                st.write("---")
+                st.write("### 🔍 Why did the AI give this result?")
+                
+                # Normalize SHAP values for a single sample
+                values = np.array(getattr(shap_values, "values", shap_values))
+                if values.ndim > 1:
+                    values = values.flatten() if values.shape[0] == 1 else values[0]
+                
+                feature_names = input_df.columns.tolist()
+                # Map feature names to human-readable versions
+                readable_names = []
+                for fname in feature_names:
+                    if model_name in FEATURE_NAME_MAP and fname in FEATURE_NAME_MAP[model_name]:
+                        readable_names.append(FEATURE_NAME_MAP[model_name][fname])
+                    else:
+                        readable_names.append(fname)
+                
+                # Ensure feature names and values match in length
+                if len(values) != len(readable_names):
+                    st.warning(f"Feature count mismatch: {len(readable_names)} features vs {len(values)} SHAP values")
+                    values = values[:len(readable_names)]
+                
+                # Create feature impacts dictionary for PDF
+                feature_impacts_dict = {readable_names[i]: float(values[i]) for i in range(len(readable_names))}
+                
+                explained_df = pd.DataFrame({
+                    "feature": readable_names,
+                    "shap_value": values.flatten()
+                })
+                explained_df["abs_shap"] = explained_df["shap_value"].abs()
+                explained_df = explained_df.nlargest(10, "abs_shap").sort_values("abs_shap", ascending=True)
+                
+                tab1, tab2 = st.tabs(["Feature Impact", "Prediction Breakdown"])
+                
+                with tab1:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    colors = ["#d62728" if v > 0 else "#1f77b4" for v in explained_df["shap_value"]]
+                    ax.barh(explained_df["feature"], explained_df["shap_value"], color=colors)
+                    ax.axvline(0, color="black", linewidth=0.8)
+                    ax.set_xlabel("SHAP value")
+                    ax.set_title("Top feature impacts on prediction")
+                    st.pyplot(fig, clear_figure=True, use_container_width=True)
+                    plt.close(fig)
+                    st.info("📊 **Feature Impact:**\n- Red bars increase risk\n- Blue bars decrease risk")
+                
+                with tab2:
+                    try:
+                        waterfall_values = np.array(getattr(shap_values, "values", shap_values))
+                        if waterfall_values.ndim > 1:
+                            waterfall_values = waterfall_values.flatten() if waterfall_values.shape[0] == 1 else waterfall_values[0]
+                        base_value = explainer.expected_value
+                        if isinstance(base_value, (list, np.ndarray)):
+                            base_value = base_value[1] if len(base_value) > 1 else base_value[0]
+                        plt.figure(figsize=(10, 6))
+                        shap.waterfall_plot(shap.Explanation(
+                            values=waterfall_values,
+                            base_values=base_value,
+                            data=input_df.iloc[0].values,
+                            feature_names=readable_names
+                        ), show=False)
+                        fig = plt.gcf()
+                        st.pyplot(fig, clear_figure=True, use_container_width=True)
+                        plt.close(fig)
+                    except Exception as exc:
+                        st.warning(f"Waterfall visualization not available for this model type. {exc}")
+        
+        # Extract feature impacts before rendering
+        values = np.array(getattr(shap_values, "values", shap_values))
+        if values.ndim > 1:
+            values = values.flatten() if values.shape[0] == 1 else values[0]
+        
+        feature_names = input_df.columns.tolist()
+        readable_names = []
+        for fname in feature_names:
+            if model_name in FEATURE_NAME_MAP and fname in FEATURE_NAME_MAP[model_name]:
+                readable_names.append(FEATURE_NAME_MAP[model_name][fname])
+            else:
+                readable_names.append(fname)
+        
+        if len(values) != len(readable_names):
+            values = values[:len(readable_names)]
+        
+        feature_impacts_dict = {readable_names[i]: float(values[i]) for i in range(len(readable_names))}
+        
+        # 1. Sort features by their SHAP values to find top drivers
+        sorted_features = sorted(feature_impacts_dict.items(), key=lambda x: x[1], reverse=True)
+        
+        # 2. Get top 3 increasing risk (Positive) and top 3 decreasing risk (Negative)
+        pos_factors = [f"{k} (+{v:.2f})" for k, v in sorted_features if v > 0][:3]
+        neg_factors = [f"{k} ({v:.2f})" for k, v in sorted_features if v < 0][-3:]
+        
+        # 3. Capture the current Bar Chart figure
+        # 'fig' is already defined in your 'tab1' block
+
+        return {
+            "explainer": explainer,
+            "shap_values": shap_values,
+            "feature_impacts": feature_impacts_dict,
+            "model_type": model_type,
+            "fig": fig,             
+            "pos_factors": pos_factors, 
+            "neg_factors": neg_factors  
+        }
+        
+    except Exception as e:
+        st.warning(f"⚠️ Could not generate detailed explanation: {str(e)}")
+        return None
+    
 
 
+def display_rag_report(disease, risk_score, patient_metrics):
+    """Generate and display RAG-audited clinical guidance directly in the main view."""
+    if not patient_metrics or risk_score is None:
+        return None
 
-# --- CSS FOR STYLING ---
-st.markdown("""
-    <style>
-    .main { background-color: #f5f7f9; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #007bff; color: white; }
-    </style>
-    """, unsafe_allow_html=True)
+    # Use a container to define a visual boundary without the 'click-to-expand' behavior
+    with st.container(border=True):
+        st.subheader("📝 RAG-Audited Clinical Summary")
+        
+        try:
+            # 1. Prepare metrics
+            active_disease_map = FEATURE_NAME_MAP.get(disease.lower().strip(), {})
+            clean_patient_metrics = {
+                active_disease_map.get(raw_key.lower().strip(), raw_key.replace('_', ' ').title()): value 
+                for raw_key, value in patient_metrics.items()
+            }
+
+            # 2. Prepare a placeholder for streamed text outside the status container
+            report_placeholder = st.empty()
+            report_text_chunks = []
+            report_placeholder.text_area("Live RAG stream", "Waiting for RAG stream...", height=300)
+
+            # 3. Use a status container for the engine steps
+            with st.status("🔍 Initializing Medical RAG Pipeline...", expanded=True) as status:
+                # 4. We pass a streaming callback that updates our placeholder
+                def streaming_callback(text_chunk):
+                    report_text_chunks.append(text_chunk)
+                    report_placeholder.text_area("Live RAG stream", "".join(report_text_chunks), height=300)
+
+                audited_report = generate_medical_audit(
+                    disease=disease,
+                    risk_score=float(risk_score),
+                    patient_metrics=clean_patient_metrics,
+                    status_updater=status,
+                    stream_callback=streaming_callback # Pass your new callback here!
+                )
+            
+            # Final touch: Ensure the result is shown cleanly after status closes
+            if audited_report and not audited_report.startswith("❌"):
+                st.success("✅ Audit Complete")
+                st.markdown("---")
+                st.write(audited_report)
+                return audited_report
+            else:
+                st.error("RAG audit failed to generate content.")
+                
+        except Exception as exc:
+            st.error(f"RAG audit system error: {exc}")
+    
+    return None
+
+
+def display_feature_impacts(model, feature_names, patient_data_scaled, title="Diagnostic Insights"):
+    """
+    Plots the local impact: (Global Weight * Patient Input).
+    """
+    # 1. Get the learned weights from the model
+    coeffs = model.coef_[0]
+    
+    # We flip it to positive because medically, higher score = higher risk.
+    cardio_idx = len(coeffs) - 1
+    if cardio_idx >= 0 and coeffs[cardio_idx] < 0:
+        coeffs[cardio_idx] = abs(coeffs[cardio_idx]) # Flip it to positive
+    # -------------------------
+    # 2. CRITICAL: Multiply weights by this specific patient's values
+    # If a feature is 'No' (0), the impact becomes 0 and the bar disappears.
+    local_impact = coeffs * patient_data_scaled.flatten()
+
+    # 3. Prepare data for PDF (Drivers vs. Protective)
+    impact_dict = {feature_names[i]: float(local_impact[i]) for i in range(len(feature_names))}
+    
+    # Sort by impact value: Positive (Risk) at top, Negative (Protective) at bottom
+    sorted_features = sorted(impact_dict.items(), key=lambda x: x[1], reverse=True)
+    
+    # Extract textual drivers
+    pos_factors = [f"{k} (+{v:.2f})" for k, v in sorted_features if v > 0][:3]
+    neg_factors = [f"{k} ({v:.2f})" for k, v in sorted_features if v < 0][-3:]
+    
+    # 3. Create the plot using the LOCAL impact, not just coeffs
+    feat_importances = pd.Series(local_impact, index=feature_names).sort_values(ascending=True)
+    
+    # Keep the red/green logic
+    colors = ['#2ca02c' if x < 0 else '#d62728' for x in feat_importances.values]
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    feat_importances.plot(kind='barh', ax=ax, color=colors)
+    ax.set_title(title)
+    ax.axvline(x=0, color='black', linewidth=1)
+    st.pyplot(fig)
+    
+    # 5. RETURN standardized dictionary
+    return {
+        "feature_impacts": impact_dict,
+        "pos_factors": pos_factors,
+        "neg_factors": neg_factors
+    }
+
+# --- SHARED PREDICTION FUNCTION ---
+def predict_risk(model_name, features):
+    try:
+        # Load model and scaler from config paths
+        model = joblib.load(MODEL_PATHS[model_name]["model"])
+        scaler = joblib.load(MODEL_PATHS[model_name]["scaler"])
+        
+        input_array = np.array(features).reshape(1, -1)
+        
+        # --- HEART SPECIFIC FIX ---
+        if model_name == "heart":
+            # Heart input is already scaled in the UI branch for the full 23-feature vector.
+            if input_array.shape[1] == 23:
+                final_input = input_array
+            else:
+                # If a raw heart feature vector is passed, scale the 6 numeric values only.
+                numerical_part = input_array[:, :5]
+                scaled_numerical = scaler.transform(numerical_part)
+                categorical_part = input_array[:, 5:]
+                final_input = np.hstack([scaled_numerical, categorical_part])
+        else:
+            # Kidney, Diabetes, and Stroke scalers were fit on ALL features
+            final_input = scaler.transform(input_array)
+        
+        prediction = model.predict(final_input)[0]
+        
+        if hasattr(model, "predict_proba"):
+            probability = model.predict_proba(final_input)[:, 1][0]
+        else:
+            probability = None
+            
+        return prediction, probability
+    
+    except FileNotFoundError as e:
+        st.error(f"File Not Found: {e}. Check if the model files exist.")
+        return None, None
+    except Exception as e:
+        st.error(f"Error: {e}")
+        return None, None
+        
+st.title("🛡️ Medical AI Suite")
+st.markdown(
+    '<div class="status-badge"><span class="status-dot"></span>Dual-Stage RAG Pipeline Active</div>', 
+    unsafe_allow_html=True
+)
+st.markdown("---")
 
 # --- SIDEBAR NAVIGATION ---
 st.sidebar.title("Diagnostic Menu")
@@ -91,294 +652,6 @@ st.markdown("---")
 
 # --- CONDITIONAL ROUTING BASED ON ACTIVE VIEW ---
 if st.session_state.current_view == "Evaluation":
-    # Load models
-    stroke_model = joblib.load(MODEL_PATHS["stroke"]["model"])
-    heart_model = joblib.load(MODEL_PATHS["heart"]["model"])
-
-    def generate_shap_explanation(model, input_df, model_name, scaler=None, output_placeholder=None):
-        """
-        Generate SHAP explanations for RandomForest models only.
-        
-        Args:
-            model: The trained ML model
-            input_df: DataFrame with features for a single prediction
-            model_name: Name of the model (kidney, heart, diabetes, stroke)
-            scaler: Optional scaler used for the model input
-            output_placeholder: Optional Streamlit container to render explanations
-        
-        Returns:
-            Dictionary with explanation data or None if failed
-        """
-        plt.close("all")
-        
-        try:
-            # Determine model type and create appropriate explainer
-            model_type = type(model).__name__
-            if "RandomForest" not in model_type:
-                st.warning("SHAP explanations are currently supported only for RandomForest models.")
-                return None
-
-            if scaler is not None:
-                scaled_array = scaler.transform(input_df.values)
-                input_df = pd.DataFrame(scaled_array, columns=input_df.columns).astype(float)
-
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(input_df, check_additivity=False)
-            if isinstance(shap_values, list):
-                shap_values = shap_values[1]
-            elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
-                # Handle SHAP versions that return shape (1, n_features, n_classes)
-                shap_values = shap_values[0, :, 1] if shap_values.shape[0] == 1 else shap_values[:, :, 1]
-
-            # Render explanation if container provided
-            if output_placeholder is not None:
-                with output_placeholder:
-                    st.write("---")
-                    st.write("### 🔍 Why did the AI give this result?")
-                    
-                    # Normalize SHAP values for a single sample
-                    values = np.array(getattr(shap_values, "values", shap_values))
-                    if values.ndim > 1:
-                        values = values.flatten() if values.shape[0] == 1 else values[0]
-                    
-                    feature_names = input_df.columns.tolist()
-                    # Map feature names to human-readable versions
-                    readable_names = []
-                    for fname in feature_names:
-                        if model_name in FEATURE_NAME_MAP and fname in FEATURE_NAME_MAP[model_name]:
-                            readable_names.append(FEATURE_NAME_MAP[model_name][fname])
-                        else:
-                            readable_names.append(fname)
-                    
-                    # Ensure feature names and values match in length
-                    if len(values) != len(readable_names):
-                        st.warning(f"Feature count mismatch: {len(readable_names)} features vs {len(values)} SHAP values")
-                        values = values[:len(readable_names)]
-                    
-                    # Create feature impacts dictionary for PDF
-                    feature_impacts_dict = {readable_names[i]: float(values[i]) for i in range(len(readable_names))}
-                    
-                    explained_df = pd.DataFrame({
-                        "feature": readable_names,
-                        "shap_value": values.flatten()
-                    })
-                    explained_df["abs_shap"] = explained_df["shap_value"].abs()
-                    explained_df = explained_df.nlargest(10, "abs_shap").sort_values("abs_shap", ascending=True)
-                    
-                    tab1, tab2 = st.tabs(["Feature Impact", "Prediction Breakdown"])
-                    
-                    with tab1:
-                        fig, ax = plt.subplots(figsize=(10, 6))
-                        colors = ["#d62728" if v > 0 else "#1f77b4" for v in explained_df["shap_value"]]
-                        ax.barh(explained_df["feature"], explained_df["shap_value"], color=colors)
-                        ax.axvline(0, color="black", linewidth=0.8)
-                        ax.set_xlabel("SHAP value")
-                        ax.set_title("Top feature impacts on prediction")
-                        st.pyplot(fig, clear_figure=True, use_container_width=True)
-                        plt.close(fig)
-                        st.info("📊 **Feature Impact:**\n- Red bars increase risk\n- Blue bars decrease risk")
-                    
-                    with tab2:
-                        try:
-                            waterfall_values = np.array(getattr(shap_values, "values", shap_values))
-                            if waterfall_values.ndim > 1:
-                                waterfall_values = waterfall_values.flatten() if waterfall_values.shape[0] == 1 else waterfall_values[0]
-                            base_value = explainer.expected_value
-                            if isinstance(base_value, (list, np.ndarray)):
-                                base_value = base_value[1] if len(base_value) > 1 else base_value[0]
-                            plt.figure(figsize=(10, 6))
-                            shap.waterfall_plot(shap.Explanation(
-                                values=waterfall_values,
-                                base_values=base_value,
-                                data=input_df.iloc[0].values,
-                                feature_names=readable_names
-                            ), show=False)
-                            fig = plt.gcf()
-                            st.pyplot(fig, clear_figure=True, use_container_width=True)
-                            plt.close(fig)
-                        except Exception as exc:
-                            st.warning(f"Waterfall visualization not available for this model type. {exc}")
-            
-            # Extract feature impacts before rendering
-            values = np.array(getattr(shap_values, "values", shap_values))
-            if values.ndim > 1:
-                values = values.flatten() if values.shape[0] == 1 else values[0]
-            
-            feature_names = input_df.columns.tolist()
-            readable_names = []
-            for fname in feature_names:
-                if model_name in FEATURE_NAME_MAP and fname in FEATURE_NAME_MAP[model_name]:
-                    readable_names.append(FEATURE_NAME_MAP[model_name][fname])
-                else:
-                    readable_names.append(fname)
-            
-            if len(values) != len(readable_names):
-                values = values[:len(readable_names)]
-            
-            feature_impacts_dict = {readable_names[i]: float(values[i]) for i in range(len(readable_names))}
-            
-            # 1. Sort features by their SHAP values to find top drivers
-            sorted_features = sorted(feature_impacts_dict.items(), key=lambda x: x[1], reverse=True)
-            
-            # 2. Get top 3 increasing risk (Positive) and top 3 decreasing risk (Negative)
-            pos_factors = [f"{k} (+{v:.2f})" for k, v in sorted_features if v > 0][:3]
-            neg_factors = [f"{k} ({v:.2f})" for k, v in sorted_features if v < 0][-3:]
-            
-            # 3. Capture the current Bar Chart figure
-            # 'fig' is already defined in your 'tab1' block
-
-            return {
-                "explainer": explainer,
-                "shap_values": shap_values,
-                "feature_impacts": feature_impacts_dict,
-                "model_type": model_type,
-                "fig": fig,             
-                "pos_factors": pos_factors, 
-                "neg_factors": neg_factors  
-            }
-            
-        except Exception as e:
-            st.warning(f"⚠️ Could not generate detailed explanation: {str(e)}")
-            return None
-        
-
-
-    def display_rag_report(disease, risk_score, patient_metrics):
-        """Generate and display RAG-audited clinical guidance directly in the main view."""
-        if not patient_metrics or risk_score is None:
-            return None
-
-        # Use a container to define a visual boundary without the 'click-to-expand' behavior
-        with st.container(border=True):
-            st.subheader("📝 RAG-Audited Clinical Summary")
-            
-            try:
-                # 1. Prepare metrics
-                active_disease_map = FEATURE_NAME_MAP.get(disease.lower().strip(), {})
-                clean_patient_metrics = {
-                    active_disease_map.get(raw_key.lower().strip(), raw_key.replace('_', ' ').title()): value 
-                    for raw_key, value in patient_metrics.items()
-                }
-
-                # 2. Prepare a placeholder for streamed text outside the status container
-                report_placeholder = st.empty()
-                report_text_chunks = []
-                report_placeholder.text_area("Live RAG stream", "Waiting for RAG stream...", height=300)
-
-                # 3. Use a status container for the engine steps
-                with st.status("🔍 Initializing Medical RAG Pipeline...", expanded=True) as status:
-                    # 4. We pass a streaming callback that updates our placeholder
-                    def streaming_callback(text_chunk):
-                        report_text_chunks.append(text_chunk)
-                        report_placeholder.text_area("Live RAG stream", "".join(report_text_chunks), height=300)
-
-                    audited_report = generate_medical_audit(
-                        disease=disease,
-                        risk_score=float(risk_score),
-                        patient_metrics=clean_patient_metrics,
-                        status_updater=status,
-                        stream_callback=streaming_callback # Pass your new callback here!
-                    )
-                
-                # Final touch: Ensure the result is shown cleanly after status closes
-                if audited_report and not audited_report.startswith("❌"):
-                    st.success("✅ Audit Complete")
-                    st.markdown("---")
-                    st.write(audited_report)
-                    return audited_report
-                else:
-                    st.error("RAG audit failed to generate content.")
-                    
-            except Exception as exc:
-                st.error(f"RAG audit system error: {exc}")
-        
-        return None
-
-
-    def display_feature_impacts(model, feature_names, patient_data_scaled, title="Diagnostic Insights"):
-        """
-        Plots the local impact: (Global Weight * Patient Input).
-        """
-        # 1. Get the learned weights from the model
-        coeffs = model.coef_[0]
-        
-        # We flip it to positive because medically, higher score = higher risk.
-        cardio_idx = len(coeffs) - 1
-        if cardio_idx >= 0 and coeffs[cardio_idx] < 0:
-            coeffs[cardio_idx] = abs(coeffs[cardio_idx]) # Flip it to positive
-        # -------------------------
-        # 2. CRITICAL: Multiply weights by this specific patient's values
-        # If a feature is 'No' (0), the impact becomes 0 and the bar disappears.
-        local_impact = coeffs * patient_data_scaled.flatten()
-
-        # 3. Prepare data for PDF (Drivers vs. Protective)
-        impact_dict = {feature_names[i]: float(local_impact[i]) for i in range(len(feature_names))}
-        
-        # Sort by impact value: Positive (Risk) at top, Negative (Protective) at bottom
-        sorted_features = sorted(impact_dict.items(), key=lambda x: x[1], reverse=True)
-        
-        # Extract textual drivers
-        pos_factors = [f"{k} (+{v:.2f})" for k, v in sorted_features if v > 0][:3]
-        neg_factors = [f"{k} ({v:.2f})" for k, v in sorted_features if v < 0][-3:]
-        
-        # 3. Create the plot using the LOCAL impact, not just coeffs
-        feat_importances = pd.Series(local_impact, index=feature_names).sort_values(ascending=True)
-        
-        # Keep the red/green logic
-        colors = ['#2ca02c' if x < 0 else '#d62728' for x in feat_importances.values]
-        
-        fig, ax = plt.subplots(figsize=(10, 6))
-        feat_importances.plot(kind='barh', ax=ax, color=colors)
-        ax.set_title(title)
-        ax.axvline(x=0, color='black', linewidth=1)
-        st.pyplot(fig)
-        
-        # 5. RETURN standardized dictionary
-        return {
-            "feature_impacts": impact_dict,
-            "pos_factors": pos_factors,
-            "neg_factors": neg_factors
-        }
-
-    # --- SHARED PREDICTION FUNCTION ---
-    def predict_risk(model_name, features):
-        try:
-            # Load model and scaler from config paths
-            model = joblib.load(MODEL_PATHS[model_name]["model"])
-            scaler = joblib.load(MODEL_PATHS[model_name]["scaler"])
-            
-            input_array = np.array(features).reshape(1, -1)
-            
-            # --- HEART SPECIFIC FIX ---
-            if model_name == "heart":
-                # Heart input is already scaled in the UI branch for the full 23-feature vector.
-                if input_array.shape[1] == 23:
-                    final_input = input_array
-                else:
-                    # If a raw heart feature vector is passed, scale the 6 numeric values only.
-                    numerical_part = input_array[:, :5]
-                    scaled_numerical = scaler.transform(numerical_part)
-                    categorical_part = input_array[:, 5:]
-                    final_input = np.hstack([scaled_numerical, categorical_part])
-            else:
-                # Kidney, Diabetes, and Stroke scalers were fit on ALL features
-                final_input = scaler.transform(input_array)
-            
-            prediction = model.predict(final_input)[0]
-            
-            if hasattr(model, "predict_proba"):
-                probability = model.predict_proba(final_input)[:, 1][0]
-            else:
-                probability = None
-                
-            return prediction, probability
-        
-        except FileNotFoundError as e:
-            st.error(f"File Not Found: {e}. Check if the model files exist.")
-            return None, None
-        except Exception as e:
-            st.error(f"Error: {e}")
-            return None, None
         
     if selection == "Overview":
         st.title("🏥 Medical AI Diagnostic Suite")
