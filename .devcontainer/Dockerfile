@@ -22,8 +22,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     # Python development headers
     python3-dev \
-    # For PDF processing
-    libpdf-dev \
     # For data processing and ML
     libgomp1 \
     # Additional useful tools
