@@ -1,6 +1,10 @@
 -- Medical AI Suite Database Initialization
 -- This script is executed when PostgreSQL container starts
 
+-- Enable necessary extensions at the top
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS vector;  -- Safe to use now that docker-compose points to pgvector/pgvector:pg16
+
 -- Create schema if not exists
 CREATE SCHEMA IF NOT EXISTS medical_ai;
 
@@ -33,7 +37,7 @@ CREATE TABLE IF NOT EXISTS medical_ai.knowledge_base (
     id SERIAL PRIMARY KEY,
     source_doc VARCHAR(255),
     chunk_text TEXT,
-    embedding_vector FLOAT8[],  -- pgvector type if available
+    embedding_vector vector(1536),  -- Standard dimensions for embeddings (e.g., OpenAI/Groq compatible text-embedding-3-small)
     metadata JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -58,10 +62,6 @@ GRANT ALL PRIVILEGES ON SCHEMA medical_ai TO postgres;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA medical_ai TO postgres;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA medical_ai TO postgres;
 
--- Enable necessary extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "json1" WITH SCHEMA public;
-
 -- Log successful initialization
 INSERT INTO medical_ai.audit_trail (event_type, user_action, details)
-VALUES ('DATABASE', 'INITIALIZATION', '{"status": "success", "timestamp": "' || NOW() || '"}');
+VALUES ('DATABASE', 'INITIALIZATION', '{"status": "success"}');
