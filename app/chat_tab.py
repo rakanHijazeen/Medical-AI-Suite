@@ -25,291 +25,203 @@ class PDFTextExtractor:
 
 def run_chat_page():
     st.markdown(
-        """
-        <style>
-        .stSidebar {
-            background: rgba(10, 14, 31, 0.95);
-            border-right: 1px solid rgba(56,189,248,0.18);
-            box-shadow: inset -3px 0 30px rgba(0,0,0,0.22);
-        }
+    """
+    <style>
+    /* =========================================================
+       GLOBAL APP SURFACE BACKGROUND
+       ========================================================= */
+    .stApp, div[data-testid="stAppViewContainer"] {
+        background: #030712 !important;
+        color: #f1f5f9 !important;
+    }
 
-        .stSidebar .stMarkdown h3,
-        .stSidebar .stMarkdown p,
-        .stSidebar .stMarkdown div {
-            color: #e2e8f0 !important;
-        }
+    /* =========================================================
+       FIX: CONTEXT UPLOADER BOX & BORDERED CONTAINERS
+       ========================================================= */
+    /* Target the exact wrapper Streamlit uses for st.container(border=True) */
+    div[data-testid="stVerticalBlockBordered"],
+    div[data-testid="stContainerBordered"] {
+        background-color: #0f1626 !important;
+        background: #0f1626 !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 12px !important;
+        padding: 1rem !important;
+    }
+    
+    /* Ensure all nested text inside the container card turns light */
+    div[data-testid="stVerticalBlockBordered"] *,
+    div[data-testid="stContainerBordered"] * {
+        color: #f1f5f9 !important;
+    }
 
-        .stSidebar .stButton>button {
-            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
-            color: #ffffff;
-            border: none;
-            border-radius: 999px;
-            padding: 0.95rem 1.2rem;
-            font-weight: 700;
-            box-shadow: 0 18px 35px rgba(56,189,248,0.18);
-        }
+    /* Target st.file_uploader internal upload zone box */
+    div[data-testid="stFileUploaderDropzone"] {
+        background-color: #1e293b !important;
+        border: 1px dashed rgba(255, 255, 255, 0.2) !important;
+    }
 
-        .stFileUploader>div {
-            background: rgba(15,23,42,0.92);
-            border: 1px dashed rgba(56,189,248,0.45);
-            border-radius: 22px;
-            padding: 22px;
-        }
+    /* Fix the "Browse files" button interior */
+    div[data-testid="stFileUploaderDropzone"] button {
+        background-color: #0f1626 !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    }
 
-        div[data-testid="stChatMessage"] {
-            border-radius: 24px !important;
-            padding: 18px !important;
-            margin-bottom: 18px !important;
-            box-shadow: 0 16px 40px rgba(0,0,0,0.25) !important;
-            border: 1px solid rgba(148,163,184,0.15) !important;
-            background: rgba(15,23,42,0.94) !important;
-        }
+    /* =========================================================
+       FIX: CHAT INPUT STYLING (STICKY BAR & TEXTAREA WRAPPERS)
+       ========================================================= */
+    /* Target the container that pins the chat input to the bottom */
+    div[data-testid="stBottomBlockContainer"] {
+        background: #030712 !important;
+    }
 
-        div[data-testid="stChatMessage"][data-owner="user"] {
-            background: linear-gradient(135deg, rgba(15,23,42,0.96), rgba(30,41,59,0.92)) !important;
-            border-color: rgba(59,130,246,0.35) !important;
-        }
+    /* Target the chat input frame and ALL its inner layout blocks */
+    div[data-testid="stChatInput"],
+    div[data-testid="stChatInput"] > div,
+    div[data-testid="stChatInput"] form {
+        background-color: #0f1626 !important;
+        background: #0f1626 !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        border-radius: 10px !important;
+    }
 
-        div[data-testid="stChatMessage"][data-owner="assistant"] {
-            background: linear-gradient(135deg, rgba(30,41,59,0.96), rgba(15,23,42,0.90)) !important;
-            border-color: rgba(148,163,184,0.22) !important;
-        }
+    /* Target the text input space directly */
+    div[data-testid="stChatInput"] textarea {
+        background: transparent !important;
+        background-color: transparent !important;
+        color: #f1f5f9 !important;
+        font-size: 0.95rem !important;
+        border: none !important;
+    }
 
-        div[data-testid="stChatInput"] {
-            border-radius: 999px !important;
-            border: 1px solid rgba(148,163,184,0.22) !important;
-            background: rgba(15,23,42,0.95) !important;
-            padding: 14px !important;
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02) !important;
-        }
+    /* Style the instruction placeholder text */
+    div[data-testid="stChatInput"] textarea::placeholder {
+        color: #64748b !important;
+    }
 
-        div[data-testid="stChatInput"] textarea {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-            min-height: 56px !important;
-            font-size: 0.95rem !important;
-            line-height: 1.4 !important;
-            caret-color: #0ea5e9 !important;
-        }
+    /* =========================================================
+       SELECTBOX DROPDOWN POPUPS
+       ========================================================= */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"],
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    div[data-testid="stSelectbox"] [role="combobox"] {
+        background-color: #0f1626 !important;
+        color: #f1f5f9 !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        border-radius: 8px !important;
+    }
 
-        .chat-hero {
-            background: linear-gradient(180deg, rgba(14,165,233,0.15), rgba(168,85,247,0.12));
-            border: 1px solid rgba(56,189,248,0.22);
-            border-radius: 24px;
-            padding: 24px 28px;
-            margin-bottom: 22px;
-            box-shadow: 0 22px 48px rgba(0,0,0,0.22);
-        }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
+        color: #f1f5f9 !important;
+    }
 
-        .chat-hero h1 {
-            margin: 0;
-            color: #f8fafc;
-            font-size: 2rem;
-            letter-spacing: -0.03em;
-        }
+    div[data-baseweb="popover"] ul, div[role="listbox"] {
+        background-color: #0f1626 !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    }
 
-        .chat-hero p {
-            margin: 10px 0 0;
-            color: #cbd5e1;
-            font-size: 1rem;
-            line-height: 1.7;
-        }
+    div[role="option"] {
+        background-color: transparent !important;
+        color: #f1f5f9 !important;
+    }
 
-        .chat-controls {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            margin-bottom: 12px;
-        }
+    div[role="option"]:hover {
+        background-color: #0ea5e9 !important;
+        color: #ffffff !important;
+    }
 
-        .quick-prompt {
-            background: rgba(255,255,255,0.04);
-            color: #e2e8f0;
-            border: 1px solid rgba(255,255,255,0.03);
-            padding: 6px 10px;
-            border-radius: 999px;
-            cursor: pointer;
-            font-weight: 600;
-        }
+    div[data-testid="stSelectbox"] svg {
+        fill: #94a3b8 !important;
+        color: #94a3b8 !important;
+    }
 
-        /* Aggressive overrides for Streamlit-generated select/dropdown popups */
-        .stSelectbox, .stMultiSelect, .stSelectbox div, .stMultiSelect div,
-        .stSelectbox button, .stMultiSelect button,
-        .stSelectbox input, .stMultiSelect input,
-        .stSelectbox .css-1wy0on6, .stMultiSelect .css-1wy0on6 {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-            border: 1px solid rgba(148,163,184,0.14) !important;
-        }
+    /* =========================================================
+       EXISTING INTERACTIVE ELEMENT OVERRIDES
+       ========================================================= */
+    /* Top Row Pill Actions Control Buttons */
+    div.stButton > button {
+        background: rgba(255, 255, 255, 0.04) !important;
+        color: #e2e8f0 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 8px !important;
+        padding: 0.4rem 1rem !important;
+        font-weight: 500 !important;
+        font-size: 0.85rem !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    div.stButton > button:hover {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: rgba(56, 189, 248, 0.4) !important;
+        color: #ffffff !important;
+    }
 
-        /* listbox / options popup (covers many renderers) */
-        [role="listbox"], [role="option"], ul[role="listbox"], li[role="option"], .rc-virtual-list {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-        }
+    /* Isolated Global Chat Message Wrappers */
+    div[data-testid="stChatMessage"] {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 1rem 0rem !important;
+    }
 
-        /* Native select and options */
-        select, select option, select:focus, option {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-        }
+    /* User Message Bubble Custom Style */
+    div[data-testid="stChatMessage"][data-owner="user"] {
+        display: flex;
+        justify-content: flex-end;
+    }
+    
+    div[data-testid="stChatMessage"][data-owner="user"] > div:nth-child(2) {
+        background: linear-gradient(135deg, #094f99 0%, #0c5cb5 100%) !important;
+        color: #ffffff !important;
+        border-radius: 12px !important;
+        padding: 14px 20px !important;
+        max-width: 75% !important;
+        border: 1px solid rgba(56, 189, 248, 0.2) !important;
+    }
 
-        /* Remove bright default arrow on some browsers */
-        select::-ms-expand { display: none; }
+    /* Assistant Card (Clinical Analysis Panel) */
+    div[data-testid="stChatMessage"][data-owner="assistant"] > div:nth-child(2) {
+        background: rgba(10, 15, 30, 0.7) !important;
+        border: 1px solid rgba(56, 189, 248, 0.15) !important;
+        border-radius: 12px !important;
+        padding: 24px !important;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.4) !important;
+    }
 
-        /* Chat input / textarea overrides (cover multiple generated classes) */
-        textarea, .stTextArea textarea, div[data-testid="stChatInput"] textarea, .stChatInput textarea {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-            border: 1px solid rgba(148,163,184,0.12) !important;
-        }
+    /* Highlighted text accents within clinical response */
+    div[data-testid="stChatMessage"][data-owner="assistant"] strong {
+        color: #ef4444 !important;
+    }
 
-        /* Ensure dropdown placeholder/text remains visible */
-        .stSelectbox .css-1d391kg, .stSelectbox .css-1v3fvcr, .stMultiSelect .css-1d391kg {
-            color: #e2e8f0 !important;
-        }
+    /* Embedded Multi-Tone Decorative Gradient Block inside results */
+    .clinical-gradient-box {
+        width: 100%;
+        height: 64px;
+        background: linear-gradient(90deg, #1d4ed8 0%, #dc2626 50%, #1e3a8a 100%);
+        border-radius: 8px;
+        margin-top: 16px;
+        opacity: 0.85;
+    }
 
-        /* Additional overrides to catch chat prompt wrappers and role-based textboxes */
-        div[data-testid="stChatInput"] > div, div[data-testid="stChatInput"] > div > div, div[role="textbox"] {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-        }
-
-        /* placeholder color */
-        textarea::placeholder, input::placeholder, div[role="textbox"]::placeholder {
-            color: #94a3b8 !important;
-        }
-        /* Force dark backgrounds and high-contrast text for all form controls */
-        select, option, input, textarea, .stSelectbox, .stTextInput, .stNumberInput, .stMultiSelect {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-            border: 1px solid rgba(148,163,184,0.14) !important;
-        }
-
-        /* Specific overrides for select dropdowns and their options */
-        select, .stSelectbox select, .stSelectbox div[role="combobox"] input {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-        }
-        option {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-        }
-
-        /* Tighter padding for inputs inside forms */
-        input[type="text"], input[type="number"], textarea {
-            padding: 10px !important;
-            border-radius: 8px !important;
-        }
-
-        /* Target Streamlit BaseWeb select component and all descendants */
-        [data-baseweb="select"],
-        [data-baseweb="select"] * {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-        }
-
-        /* Combobox input specifically */
-        input[role="combobox"],
-        input[role="combobox"]:focus {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-            border: 1px solid rgba(148,163,184,0.14) !important;
-        }
-
-        /* Listbox popup when opened */
-        [role="listbox"], [role="listbox"] * {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-        }
-
-        /* Option items in listbox */
-        [role="option"] {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-        }
-        [role="option"]:hover {
-            background: rgba(56,189,248,0.12) !important;
-            color: #e2e8f0 !important;
-        }
-
-        /* Specific overrides for chat input textarea */
-        [data-baseweb="textarea"],
-        [data-baseweb="base-input"],
-        textarea[data-testid="stChatInputTextArea"] {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-            border: 1px solid rgba(148,163,184,0.12) !important;
-        }
-
-        textarea[data-testid="stChatInputTextArea"]::placeholder {
-            color: #94a3b8 !important;
-        }
-
-        /* Force dark on entire chat input container and all children */
-        div[data-testid="stChatInput"],
-        div[data-testid="stChatInput"] * {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-        }
-
-        /* Ensure the textarea text input is dark and readable */
-        div[data-baseweb="textarea"] textarea,
-        textarea {
-            background: rgba(15,23,42,0.96) !important;
-            color: #e2e8f0 !important;
-            caret-color: #0ea5e9 !important;
-        }
-
-        /* Force dark on outer chat input container wrappers */
-        .stBottom,
-        .stElementContainer,
-        .stVerticalBlock,
-        div[data-testid="stBottomBlockContainer"],
-        div[data-testid="stVerticalBlock"],
-        div[data-testid="stElementContainer"] {
-            background: rgba(15,23,42,0.96) !important;
-        }
-
-        /* Chat input field - fix border edges */
-        div[data-testid="stChatInput"] {
-            border: 1px solid rgba(56,189,248,0.25) !important;
-            border-radius: 12px !important;
-            background: rgba(20,28,50,0.8) !important;
-            box-shadow: inset 0 0 0 1px rgba(56,189,248,0.08) !important;
-        }
-
-        /* Sidebar input fields - remove white backgrounds */
-        .stSidebar input[type="text"],
-        .stSidebar .stTextInput input,
-        .stSidebar div[data-baseweb="input"] input,
-        .stSidebar input {
-            background: rgba(20,28,50,0.8) !important;
-            color: #e2e8f0 !important;
-            border: 1px solid rgba(148,163,184,0.16) !important;
-            border-radius: 8px !important;
-        }
-
-        .stSidebar div[data-baseweb="input"] {
-            background: rgba(20,28,50,0.8) !important;
-            border: 1px solid rgba(148,163,184,0.16) !important;
-        }
-
-        /* Sidebar select field backgrounds */
-        .stSidebar .stSelectbox,
-        .stSidebar [data-baseweb="select"] {
-            background: rgba(20,28,50,0.8) !important;
-            border: 1px solid rgba(148,163,184,0.16) !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        '<div class="chat-hero"><h1>💬 Interactive Case Consultant Workspace</h1><p>Query global clinical reference guidelines alongside localized patient audit records.</p></div>',
-        unsafe_allow_html=True,
-    )
+    /* Bottom Status/Compliance Meta text styling */
+    .chat-metadata-footer {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: #475569;
+        margin-top: 6px;
+        padding: 0 4px;
+    }
+    
+    /* Persistent Navigation Custom Sidebar Fixes */
+    .stSidebar {
+        background: #060913 !important;
+        border-right: 1px solid rgba(255,255,255,0.05) !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
     # 1. Structural Layout Split (Sidebar Controls vs Main Canvas)
     with st.sidebar:

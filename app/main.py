@@ -20,312 +20,250 @@ from app.config import MODEL_PATHS, FEATURE_NAME_MAP, REFERENCE_RANGES, FEATURE_
 from pdf_report import create_report
 from app.chat_tab import run_chat_page
 from app.rag.chat_engine import MedicalChatEngine
+from streamlit_option_menu import option_menu
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="Medical AI Suite", page_icon="🩺", layout="wide")
 
 st.markdown("""
     <style>
+    /* Global Base Theme Initialization */
     :root {
-        color-scheme: dark;
-        font-family: Inter, system-ui, sans-serif;
+        color-scheme: dark !important;
     }
 
-    .stApp {
-        background: radial-gradient(circle at top left, rgba(14,165,233,0.18), transparent 28%),
-                    radial-gradient(circle at bottom right, rgba(168,85,247,0.18), transparent 25%),
-                    linear-gradient(180deg, #0b1121 0%, #0f172a 100%);
-        color: #e2e8f0;
-        min-height: 100vh;
+    .stApp, .stAppHeader, div[data-testid="stAppViewContainer"], .main, section[data-testid="stMain"] {
+        background-color: #0f172a !important;
+        background: #0f172a !important;
+        color: #f8fafc !important;
     }
 
+    /* Primary Dashboard Workspace Layout Block */
     .block-container {
-        background: rgba(15,23,42,0.92);
-        border: 1px solid rgba(59,130,246,0.16);
-        box-shadow: 0 20px 80px rgba(0, 0, 0, 0.35);
-        border-radius: 24px;
-        padding: 28px 32px;
+        background-color: #1e293b !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4) !important;
+        border-radius: 16px !important;
+        padding: 2rem !important;
     }
 
-    .stHeader, .css-1v3fvcr, .css-1lsmgbg {
-        background: transparent;
-    }
-
-    .stSidebar {
-        background: rgba(15, 23, 42, 0.98);
-        border-right: 1px solid rgba(59,130,246,0.14);
-        box-shadow: inset -4px 0 30px rgba(0,0,0,0.15);
-    }
-
-    .stSidebar, .stSidebar * {
-        color: #e2e8f0 !important;
-    }
-
-    .stSidebar input,
-    .stSidebar select,
-    .stSidebar textarea,
-    .stSidebar button {
-        color: #e2e8f0 !important;
-        background: rgba(15,23,42,0.95) !important;
-        border-color: rgba(148,163,184,0.22) !important;
-    }
-
-    .css-1d391kg, .css-1d391kg .css-1v3fvcr {
-        color: #e2e8f0;
-    }
-
-    .stSidebar .stButton>button {
-        background: linear-gradient(135deg, #0ea5e9 0%, #818cf8 100%);
-        color: #f8fafc;
-        border: none;
-        border-radius: 9999px;
-        padding: 0.95rem 1.2rem;
-        font-weight: 700;
-        box-shadow: 0 18px 35px rgba(14,165,233,0.18);
-    }
-
-    .stSidebar .stRadio>div {
-        background: rgba(15, 23, 42, 0.85);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 18px;
-        padding: 1rem;
-    }
-
-    .block-container label,
-    .block-container input,
-    .block-container select,
-    .block-container textarea,
-    .block-container div,
-    .block-container span {
-        color: #e2e8f0 !important;
-    }
-
-    .block-container input,
-    .block-container select,
-    .block-container textarea,
-    .block-container .stSelectbox,
-    .block-container .stNumberInput {
-        background: rgba(15,23,42,0.92) !important;
-        border: 1px solid rgba(148,163,184,0.18) !important;
-    }
-
-    .stButton>button {
-        background: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%);
-        border: none;
-        color: #ffffff;
-        font-weight: 700;
-        border-radius: 14px;
-        padding: 0.85rem 1.2rem;
-        transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
-        box-shadow: 0 14px 30px rgba(56,189,248,0.18);
-    }
-
-    .stButton>button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 18px 40px rgba(56,189,248,0.28);
-        filter: brightness(1.05);
-    }
-
-    .stButton>button:focus-visible {
-        outline: 2px solid rgba(56,189,248,0.65);
-        outline-offset: 2px;
-    }
-
-    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4 {
-        color: #f8fafc;
-    }
-
-    .stMarkdown p,
-    .stMarkdown div,
-    .stMarkdown span,
-    .stText,
-    .css-1d391kg {
-        color: #cbd5e1;
-    }
-
-    .css-10trblm {
-        background: rgba(15, 23, 42, 0.82) !important;
-    }
-
-    .status-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        background: rgba(14,165,233,0.12);
-        border: 1px solid rgba(14,165,233,0.4);
-        color: #a5f3fc;
-        padding: 8px 14px;
-        border-radius: 9999px;
-        font-size: 0.9rem;
-        font-weight: 700;
-        backdrop-filter: blur(10px);
-    }
-
-    .status-dot {
-        height: 10px;
-        width: 10px;
-        background: linear-gradient(135deg, #38bdf8, #0ea5e9);
-        border-radius: 50%;
-        display: inline-block;
-        box-shadow: 0 0 14px rgba(14,165,233,0.8);
-    }
-
-    .chat-bubble-user {
-        background: linear-gradient(180deg, rgba(15,23,42,0.96), rgba(30,41,59,0.9));
-        border-radius: 24px 24px 6px 24px;
-        padding: 16px 18px;
-        margin: 12px 0;
-        max-width: 84%;
-        margin-left: auto;
-        color: #e2e8f0;
-        border: 1px solid rgba(71,85,105,0.4);
-        box-shadow: 0 16px 40px rgba(15,23,42,0.35);
-    }
-
-    .chat-bubble-ai {
-        background: linear-gradient(180deg, rgba(30,41,59,0.96), rgba(15,23,42,0.9));
-        border-radius: 24px 24px 24px 6px;
-        padding: 16px 18px;
-        margin: 12px 0;
-        max-width: 84%;
-        color: #e2e8f0;
-        border: 1px solid rgba(51,65,85,0.45);
-        box-shadow: 0 16px 40px rgba(15,23,42,0.35);
-    }
-
-    .citation-pill {
-        display: inline-block;
-        background: rgba(2, 132, 199, 0.14);
-        color: #bae6fd;
-        font-size: 0.78rem;
-        padding: 5px 8px;
-        border-radius: 9999px;
-        margin-left: 4px;
-        font-weight: 700;
-        border: 1px solid rgba(2,132,199,0.28);
-    }
-    /* Ensure form controls and dropdowns follow dark theme */
-    select, option, input, textarea, .stSelectbox, .stTextInput, .stNumberInput, .stMultiSelect {
-        background: rgba(15,23,42,0.96) !important;
-        color: #e2e8f0 !important;
-        border: 1px solid rgba(148,163,184,0.14) !important;
-    }
-
-    /* Streamlit specific chat input and dropdown popups */
-    div[data-testid="stChatInput"], div[data-testid="stChatInput"] textarea, div[data-testid="stChatInput"] > div {
-        background: rgba(15,23,42,0.98) !important;
-        color: #e2e8f0 !important;
-        border: 1px solid rgba(148,163,184,0.12) !important;
-    }
-
-    /* Role-based overrides for many dropdown renderers */
-    [role="listbox"], [role="option"], ul[role="listbox"], li[role="option"], .rc-virtual-list {
-        background: rgba(15,23,42,0.96) !important;
-        color: #e2e8f0 !important;
-    }
-
-    /* Placeholder color for inputs */
-    ::placeholder { color: #94a3b8 !important; }
-
-    /* Target Streamlit BaseWeb select component and all descendants */
-    [data-baseweb="select"],
-    [data-baseweb="select"] * {
-        background: rgba(15,23,42,0.96) !important;
-        color: #e2e8f0 !important;
-    }
-
-    /* Combobox input specifically */
-    input[role="combobox"],
-    input[role="combobox"]:focus {
-        background: rgba(15,23,42,0.96) !important;
-        color: #e2e8f0 !important;
-        border: 1px solid rgba(148,163,184,0.14) !important;
-    }
-
-    /* Listbox popup when opened */
-    [role="listbox"], [role="listbox"] * {
-        background: rgba(15,23,42,0.96) !important;
-        color: #e2e8f0 !important;
-    }
-
-    /* Option items in listbox */
-    [role="option"] {
-        background: rgba(15,23,42,0.96) !important;
-        color: #e2e8f0 !important;
-    }
-    [role="option"]:hover {
-        background: rgba(56,189,248,0.12) !important;
-        color: #e2e8f0 !important;
-    }
-
-    /* Specific overrides for chat input textarea and BaseWeb textareas */
-    [data-baseweb="textarea"],
-    [data-baseweb="base-input"],
-    textarea[data-testid="stChatInputTextArea"] {
-        background: rgba(15,23,42,0.96) !important;
-        color: #e2e8f0 !important;
-        border: 1px solid rgba(148,163,184,0.12) !important;
-    }
-
-    textarea[data-testid="stChatInputTextArea"]::placeholder,
-    [data-baseweb="textarea"]::placeholder {
-        color: #94a3b8 !important;
-    }
-
-    /* Force dark on entire chat input container and all children */
-    div[data-testid="stChatInput"],
-    div[data-testid="stChatInput"] * {
-        background: rgba(15,23,42,0.96) !important;
-        color: #e2e8f0 !important;
-    }
-
-    /* Ensure the textarea text input is dark and readable */
-    div[data-baseweb="textarea"] textarea,
-    textarea {
-        background: rgba(15,23,42,0.96) !important;
-        color: #e2e8f0 !important;
-        caret-color: #0ea5e9 !important;
-    }
-
-    /* Force dark on outer chat input container wrappers */
-    .stBottom,
-    .stElementContainer,
-    .stVerticalBlock,
-    div[data-testid="stBottomBlockContainer"],
-    div[data-testid="stVerticalBlock"],
-    div[data-testid="stElementContainer"] {
-        background: rgba(15,23,42,0.96) !important;
-    }
-
-    /* Chat input field - fix border edges */
-    div[data-testid="stChatInput"] {
-        border: 1px solid rgba(56,189,248,0.25) !important;
-        border-radius: 12px !important;
-        background: rgba(20,28,50,0.8) !important;
-        box-shadow: inset 0 0 0 1px rgba(56,189,248,0.08) !important;
-    }
-
-    /* Sidebar input fields - remove white backgrounds */
-    .stSidebar input[type="text"],
-    .stSidebar .stTextInput input,
-    .stSidebar div[data-baseweb="input"] input,
-    .stSidebar input {
-        background: rgba(20,28,50,0.8) !important;
-        color: #e2e8f0 !important;
-        border: 1px solid rgba(148,163,184,0.16) !important;
+    /* =========================================================
+       1. HIGH-CONTRAST BORDERS & DARK INPUT BACKGROUNDS (FIXED)
+       ========================================================= */
+    /* Target both standard inputs and textareas */
+    div[data-baseweb="base-input"],
+    div[data-baseweb="input"] {
+        background-color: #1e293b !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
         border-radius: 8px !important;
     }
 
-    .stSidebar div[data-baseweb="input"] {
-        background: rgba(20,28,50,0.8) !important;
-        border: 1px solid rgba(148,163,184,0.16) !important;
+    input, textarea {
+        background-color: transparent !important;
+        color: #f8fafc !important;
     }
 
-    /* Sidebar select field backgrounds */
-    .stSidebar .stSelectbox,
-    .stSidebar [data-baseweb="select"] {
-        background: rgba(20,28,50,0.8) !important;
-        border: 1px solid rgba(148,163,184,0.16) !important;
+    /* CRITICAL FIX: Target the exact inner container of the st.selectbox dropdowns */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"],
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+        background-color: #1e293b !important;
+        color: #f8fafc !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 8px !important;
+    }
+
+    /* Fix text readability inside the selected dropdown option */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
+        color: #f8fafc !important;
+    }
+
+    /* STYLING FOR THE OPENED DROPDOWN MENU OPTIONS */
+    div[data-baseweb="menu"], 
+    div[data-baseweb="popover"] ul, 
+    div[role="listbox"] {
+        background-color: #1e293b !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    div[role="option"] {
+        background-color: transparent !important;
+        color: #f8fafc !important;
+    }
+
+    div[role="option"]:hover {
+        background-color: #0ea5e9 !important;
+        color: #ffffff !important;
+    }
+
+    /* Fix dropdown select menu arrows visibility against slate background */
+    div[data-testid="stSelectbox"] svg {
+        fill: #94a3b8 !important;
+        color: #94a3b8 !important;
+    }
+
+    /* Interactive state color shifts when targeted */
+    div[data-baseweb="input"]:focus-within, 
+    div[data-baseweb="select"]:focus-within,
+    div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within {
+        border-color: #0ea5e9 !important;
+        box-shadow: 0 0 0 1px #0ea5e9 !important;
+    }
+
+    /* =========================================================
+       2. RE-STYLING AND OUTLINING THE DYNAMIC RESULTS BLOCK
+       ========================================================= */
+    div[data-testid="stMetric"], .stMetric {
+        background-color: #0f172a !important;
+        background: #0f172a !important;
+        border: 1px solid rgba(255, 255, 255, 0.35) !important;
+        border-radius: 12px !important;
+        padding: 16px 20px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    }
+
+    div[data-testid="stMetric"] label, 
+    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+        color: #ffffff !important;
+    }
+
+    /* =========================================================
+       3. RE-STYLING BUTTON CONTROLS & STEP COUNTERS
+       ========================================================= */
+    button, 
+    div[data-testid="stBaseButton-secondary"] button,
+    div[data-testid="stBaseButton-primary"] button {
+        background-color: #0f172a !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.45) !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease !important;
+    }
+
+    button:hover {
+        background-color: #1e293b !important;
+        border-color: #0ea5e9 !important;
+        color: #0ea5e9 !important;
+    }
+
+    /* =========================================================
+       4. NAVIGATION HEADER ROW ALIGNMENT (FIXED)
+       ========================================================= */
+    /* Removed destructive `*` selectors that broke the sliders and inputs */
+    div[data-testid="stVerticalBlock"] {
+        background-color: transparent !important;
+    }
+
+    div[data-testid="column"], div[data-testid="stColumn"], div[data-testid="stHorizontalBlock"], div[data-testid="element-container"], .element-container {
+        background-color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    .block-container > div:nth-child(1) div[data-testid="stHorizontalBlock"] {
+        background-color: #0f172a !important;
+        background: #0f172a !important;
+        border-radius: 12px !important;
+        padding: 10px 16px !important;
+        margin-bottom: 2rem !important;
+        display: flex !important;
+        align-items: center !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+
+    div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"]:nth-child(1) {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .brand-logo-text {
+        font-size: 1.5rem !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.03em !important;
+        color: #ffffff !important;
+        white-space: nowrap !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center;
+    }
+
+    /* =========================================================
+       5. SIDEBAR & DROPZONE ATTACHMENTS 
+       ========================================================= */
+    section[data-testid="stSidebar"] {
+        background-color: #090d16 !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+    
+    section[data-testid="stSidebar"] * {
+        color: #e2e8f0 !important;
+    }
+
+    div[data-testid="stFileUploaderDropzone"] {
+        background-color: #0f172a !important;
+        border: 1px dashed rgba(255, 255, 255, 0.3) !important;
+    }
+
+    /* =========================================================
+       6. CHAT WINDOW WRAPPERS 
+       ========================================================= */
+    div[data-testid="stChatInput"] {
+        background-color: #1e293b !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 12px !important;
+    }
+
+    div[data-testid="stChatInput"] textarea {
+        background-color: transparent !important;
+        color: #ffffff !important;
+    }
+
+    /* =========================================================
+       7. INLINE CLINICAL DISCLAIMER LAYOUT 
+       ========================================================= */
+    .clinical-disclaimer-box {
+        background-color: rgba(239, 68, 68, 0.06) !important;
+        border: 1px solid rgba(239, 68, 68, 0.25) !important;
+        border-radius: 12px !important;
+        padding: 16px 20px !important;
+        margin-top: 2rem !important;
+        margin-bottom: 1rem !important;
+        width: 100% !important;
+        box-sizing: border-box;
+    }
+    
+    .disclaimer-title {
+        color: #f87171 !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        margin-bottom: 6px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    .disclaimer-text {
+        color: #cbd5e1 !important;
+        font-size: 0.9rem !important;
+        line-height: 1.6 !important;
+        margin: 0 !important;
+    }
+
+    /* =========================================================
+       8. GENERAL TYPOGRAPHY CONTRAST RECOVERY 
+       ========================================================= */
+    h1, h2, h3, h4, h5, h6, [data-testid="stHeader"] {
+        color: #ffffff !important;
+    }
+
+    .stMarkdown, .stMarkdown p, .stMarkdown div, span, label, p {
+        color: #e2e8f0 !important;
+    }
+    ::placeholder {
+        color: #64748b !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -618,591 +556,712 @@ def predict_risk(model_name, features):
     except Exception as e:
         st.error(f"Error: {e}")
         return None, None
+
+def run_guidelines_page():
+    st.markdown("## 📋 Clinical Guidelines & Verification Repositories")
+    st.markdown("Review and access the authoritative, peer-reviewed knowledge bases that underpin the AI's diagnostic logic. Each guideline card links directly to the official source document, ensuring you can verify and explore the evidence behind every recommendation.")
+    st.write("---")
+
+    # Define your source dataset (Replace URLs with actual guidelines links)
+    guidelines_data = [
+        {
+            "title": "2026 KDIGO Clinical Practice Guideline Update",
+            "scope": "Kidney Disease / Renal Metrics & Diabetes",
+            "version": "March 2026 Public Review",
+            "desc": "The newest consensus on managing Chronic Kidney Disease in patients with diabetes. Essential for calculating combined filtration thresholds, SGLT2i/nsMRA safety guardrails, and staging protocols.",
+            "url": "https://kdigo.org/wp-content/uploads/2026/03/KDIGO-2026-Diabetes-and-CKD-Guideline-Update-Public-Review-Draft-March-2026.pdf",
+            "icon": "🩺"
+        },
+        {
+            "title": "ADA Standards of Care in Diabetes: Diagnosis & Classification",
+            "scope": "Diabetes / Metabolic Indicators",
+            "version": "Current Care Supplement",
+            "desc": "Official American Diabetes Association criteria defining precise fasting plasma glucose, 2-hour post-load plasma glucose, and HbA1c metrics required to establish metabolic safety margins.",
+            "url": "https://diabetesjournals.org/care/article/49/Supplement_1/S27/163926/2-Diagnosis-and-Classification-of-Diabetes",
+            "icon": "🩸"
+        },
+        {
+            "title": "2026 AHA / ASA Ischemic Stroke Early Management",
+            "scope": "Stroke & Cerebrovascular Markers",
+            "version": "AHA/ASA Protocol",
+            "desc": "Authoritative guidance on acute management timelines, cerebrovascular risk factor weightings, age adjustments, and physiological stabilizing thresholds in acute ischemic events.",
+            "url": "https://www.stroke-manual.com/wp-content/uploads/2026/01/2026-AHA-ASA-early-management-of-ischemic-stroke.pdf",
+            "icon": "🧠"
+        },
+        {
+            "title": "ACC / AHA Multimodality Cardiovascular Risk Matrix",
+            "scope": "Heart Disease / Vascular Indicators",
+            "version": "JACC Expert Consensus",
+            "desc": "Comprehensive framework detailing the use of cardiovascular imaging, biomarker trends, and arterial risk tracking tools to evaluate and manage atherosclerotic cardiovascular risk.",
+            "url": "https://www.jacc.org/doi/10.1016/j.jacc.2021.12.011",
+            "icon": "❤️"
+        }
+    ]
+
+    # Generate an elegant responsive grid layout (2 Columns)
+    for i in range(0, len(guidelines_data), 2):
+        col1, col2 = st.columns(2, gap="large")
         
-st.title("🛡️ Medical AI Suite")
-st.markdown(
-    '<div class="status-badge"><span class="status-dot"></span>Dual-Stage RAG Pipeline Active</div>', 
-    unsafe_allow_html=True
-)
-st.markdown("---")
+        # Render Left Card
+        with col1:
+            item = guidelines_data[i]
+            render_guideline_card(item)
+            
+        # Render Right Card (If item exists)
+        with col2:
+            if i + 1 < len(guidelines_data):
+                item = guidelines_data[i+1]
+                render_guideline_card(item)
 
-# --- SIDEBAR NAVIGATION ---
-st.sidebar.title("Diagnostic Menu")
-selection = st.sidebar.radio("Select Analysis:", ["Overview", "Kidney Disease", "Heart Disease", "Diabetes", "Stroke"])
+def render_guideline_card(item):
+    """Renders a fully styled, premium hyperlinked clinical guideline component card."""
+    card_html = f"""
+    <a href="{item['url']}" target="_blank" style="text-decoration: none; color: inherit;">
+        <div style="
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(56, 189, 248, 0.15);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease-in-out;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        " class="guideline-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                <span style="font-size: 2rem;">{item['icon']}</span>
+                <span style="
+                    background: rgba(56, 189, 248, 0.1); 
+                    color: #38bdf8; 
+                    font-size: 0.75rem; 
+                    font-weight: 600; 
+                    padding: 4px 10px; 
+                    border-radius: 999px;
+                    border: 1px solid rgba(56, 189, 248, 0.2);
+                ">{item['version']}</span>
+            </div>
+            <h3 style="margin: 0 0 4px 0; color: #ffffff; font-size: 1.25rem; font-weight: 600;">{item['title']}</h3>
+            <span style="color: #64748b; font-size: 0.85rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em;">{item['scope']}</span>
+            <p style="margin: 14px 0 0 0; color: #cbd5e1; font-size: 0.9rem; line-height: 1.5;">{item['desc']}</p>
+            <div style="margin-top: 18px; display: flex; align-items: center; color: #38bdf8; font-size: 0.85rem; font-weight: 600;">
+                Launch Official Repository &nbsp;→
+            </div>
+        </div>
+    </a>
+    """
+    st.markdown(card_html, unsafe_allow_html=True)
 
-if "chat_engine" not in st.session_state:
-    st.session_state.chat_engine = MedicalChatEngine()
+st.set_page_config(layout="wide")
+
+# 2. Split layout row: Column 1 for Logo/Brand, Column 2 for the Option Menu Navigation
+# Adjust ratios (e.g., 1.2 to 5) depending on your menu item widths
+header_left, header_right = st.columns([1.5, 5], gap="small")
+
+with header_left:
+    # Styled Text-Logo (using an inline medical cross icon wrapper)
+    st.markdown(
+        '<p class="brand-logo-text"><span style="color: #0ea5e9; margin-right: 8px;"></span>Medical AI Suite</p>', 
+        unsafe_allow_html=True
+    )
+
+with header_right:
+    # --- NAVIGATION ---
+    selection = option_menu(menu_title=None, 
+                            options=["Overview", "Kidney Disease", "Heart Disease", "Diabetes", "Stroke", "AI Clinical Assistant", "Clinical Guidelines"],
+                            icons=["house", "droplet-half", "heart-pulse", "activity", "file-medical", "chat-square-dots", "book"],
+                            orientation="horizontal",
+                            styles={
+                                "container": {
+                                    "padding": "0!important", 
+                                    "background-color": "#0f172a", 
+                                    "border": "none",
+                                    "margin": "0!important"
+                                },
+                                "icon": {"color": "#94a3b8", "font-size": "0.9rem"}, 
+                                "nav-link": {
+                                    "font-size": "0.85rem", 
+                                    "text-align": "center", 
+                                    "padding": "0.5rem 0.7rem",
+                                    "margin": "0px 4px", 
+                                    "--hover-color": "#1e293b", 
+                                    "color": "#cbd5e1",
+                                    "border-radius": "6px"
+                                },
+                                "nav-link-selected": {
+                                    "background-color": "#0ea5e9", 
+                                    "color": "#ffffff",
+                                    "font-weight": "600"
+                                },
+                            }
+                        )
+st.write("---")
+
+if selection == "Overview":
+    st.title("Medical AI Diagnostic Suite")
+    st.write("Select a category from the sidebar to begin. These models are optimized for clinical accuracy.")
     
-# --- Track Active Tab Mode in Session State ---
-if "current_view" not in st.session_state:
-    st.session_state.current_view = "Evaluation"
 
-# Render two buttons side-by-side to act as your pristine view controllers
-col_btn1, col_btn2 = st.columns(2)
-with col_btn1:
-    if st.button("📋 Clinical Evaluation & Audit", type="primary" if st.session_state.current_view == "Evaluation" else "secondary"):
-        st.session_state.current_view = "Evaluation"
-        st.rerun()
-with col_btn2:
-    if st.button("💬 Interactive Case Consultant", type="primary" if st.session_state.current_view == "Chat" else "secondary"):
-        st.session_state.current_view = "Chat"
-        st.rerun()
-
-st.markdown("---")
-
-# --- CONDITIONAL ROUTING BASED ON ACTIVE VIEW ---
-if st.session_state.current_view == "Evaluation":
+# --- KIDNEY DISEASE (24 Features) ---
+elif selection == "Kidney Disease":
+    st.title("Kidney Disease Prediction")
+    patient_name = st.text_input("Patient Name", "Anonymous")
+    
+    with st.container(border=True):
+        st.subheader("Comprehensive Patient Data")
+        col1, col2, col3 = st.columns(3)
         
-    if selection == "Overview":
-        st.title("🏥 Medical AI Diagnostic Suite")
-        st.write("Select a category from the sidebar to begin. These models are optimized for clinical accuracy.")
+        with col1:
+            age = st.number_input("Age", 0, 100, 48)
+            bp = st.number_input("Blood Pressure", 50, 180, 80)
+            sg = st.selectbox("Specific Gravity", [1.005, 1.010, 1.015, 1.020, 1.025], index=3)
+            al = st.slider("Albumin", 0, 5, 1)
+            su = st.slider("Sugar", 0, 5, 0)
+            rbc = st.selectbox("Red Blood Cells", ["Normal", "Abnormal"])
+            pc = st.selectbox("Pus Cell", ["Normal", "Abnormal"])
+            pcc = st.selectbox("Pus Cell Clumps", ["Not Present", "Present"])
 
-    # --- KIDNEY DISEASE (24 Features) ---
-    elif selection == "Kidney Disease":
-        st.title("🧪 Kidney Disease Prediction")
-        patient_name = st.text_input("Patient Name", "Anonymous")
+        with col2:
+            ba = st.selectbox("Bacteria", ["Not Present", "Present"])
+            bgr = st.number_input("Blood Glucose Random", 50.0, 500.0, 121.0)
+            bu = st.number_input("Blood Urea", 5.0, 400.0, 36.0)
+            sc = st.number_input("Serum Creatinine", 0.1, 15.0, 1.2)
+            sod = st.number_input("Sodium", 100.0, 170.0, 137.0)
+            pot = st.number_input("Potassium", 2.0, 50.0, 4.4)
+            hemo = st.number_input("Hemoglobin", 3.0, 18.0, 15.4)
+            pcv = st.number_input("Packed Cell Volume", 10, 55, 44)
+
+        with col3:
+            wc = st.number_input("White Blood Cell Count", 2000, 20000, 7800)
+            rc = st.number_input("Red Blood Cell Count", 2.0, 8.0, 5.2)
+            htn = st.selectbox("Hypertension", ["No", "Yes"])
+            dm = st.selectbox("Diabetes Mellitus", ["No", "Yes"])
+            cad = st.selectbox("Coronary Artery Disease", ["No", "Yes"])
+            appet = st.selectbox("Appetite", ["Good", "Poor"])
+            pe = st.selectbox("Pedal Edema", ["No", "Yes"])
+            ane = st.selectbox("Anemia", ["No", "Yes"])
+
+    if st.button("Predict Kidney Health"):
+        # 1. Initialize all 24 features
+        features = [0] * 24
+
+        # 2. Map all UI inputs to the features list
+        features[0] = age
+        features[1] = bp
+        features[2] = float(sg)
+        features[3] = al
+        features[4] = su
+        features[5] = 1 if rbc == "Abnormal" else 0
+        features[6] = 1 if pc == "Abnormal" else 0
+        features[7] = 1 if pcc == "Present" else 0
+        features[8] = 1 if ba == "Present" else 0
+        features[9] = bgr
+        features[10] = bu
+        features[11] = sc
+        features[12] = sod
+        features[13] = pot
+        features[14] = hemo
+        features[15] = pcv
+        features[16] = wc
+        features[17] = rc
+        features[18] = 1 if htn == "Yes" else 0
+        features[19] = 1 if dm == "Yes" else 0
+        features[20] = 1 if cad == "Yes" else 0
+        features[21] = 1 if appet == "Poor" else 0
+        features[22] = 1 if pe == "Yes" else 0
+        features[23] = 1 if ane == "Yes" else 0
         
-        with st.container(border=True):
-            st.subheader("🩺 Comprehensive Patient Data")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                age = st.number_input("Age", 0, 100, 48)
-                bp = st.number_input("Blood Pressure", 50, 180, 80)
-                sg = st.selectbox("Specific Gravity", [1.005, 1.010, 1.015, 1.020, 1.025], index=3)
-                al = st.slider("Albumin", 0, 5, 1)
-                su = st.slider("Sugar", 0, 5, 0)
-                rbc = st.selectbox("Red Blood Cells", ["Normal", "Abnormal"])
-                pc = st.selectbox("Pus Cell", ["Normal", "Abnormal"])
-                pcc = st.selectbox("Pus Cell Clumps", ["Not Present", "Present"])
+        # 3. Get Prediction
+        res, prob = predict_risk("kidney", features)
+        
+        # 4. Display Result with Float Conversion Fix
+        if res == 1: 
+            result_text = f"CKD Detected (Risk Score: {prob:.2%})"
+            st.error(f"Result: {result_text}")
+            st.progress(float(prob)) 
+        else: 
+            result_text = f"Healthy (Confidence: {1-prob:.2%})"
+            st.success(f"Result: {result_text}")
+            st.progress(float(1 - prob))
 
-            with col2:
-                ba = st.selectbox("Bacteria", ["Not Present", "Present"])
-                bgr = st.number_input("Blood Glucose Random", 50.0, 500.0, 121.0)
-                bu = st.number_input("Blood Urea", 5.0, 400.0, 36.0)
-                sc = st.number_input("Serum Creatinine", 0.1, 15.0, 1.2)
-                sod = st.number_input("Sodium", 100.0, 170.0, 137.0)
-                pot = st.number_input("Potassium", 2.0, 50.0, 4.4)
-                hemo = st.number_input("Hemoglobin", 3.0, 18.0, 15.4)
-                pcv = st.number_input("Packed Cell Volume", 10, 55, 44)
-
-            with col3:
-                wc = st.number_input("White Blood Cell Count", 2000, 20000, 7800)
-                rc = st.number_input("Red Blood Cell Count", 2.0, 8.0, 5.2)
-                htn = st.selectbox("Hypertension", ["No", "Yes"])
-                dm = st.selectbox("Diabetes Mellitus", ["No", "Yes"])
-                cad = st.selectbox("Coronary Artery Disease", ["No", "Yes"])
-                appet = st.selectbox("Appetite", ["Good", "Poor"])
-                pe = st.selectbox("Pedal Edema", ["No", "Yes"])
-                ane = st.selectbox("Anemia", ["No", "Yes"])
-
-        if st.button("Predict Kidney Health"):
-            # 1. Initialize all 24 features
-            features = [0] * 24
-
-            # 2. Map all UI inputs to the features list
-            features[0] = age
-            features[1] = bp
-            features[2] = float(sg)
-            features[3] = al
-            features[4] = su
-            features[5] = 1 if rbc == "Abnormal" else 0
-            features[6] = 1 if pc == "Abnormal" else 0
-            features[7] = 1 if pcc == "Present" else 0
-            features[8] = 1 if ba == "Present" else 0
-            features[9] = bgr
-            features[10] = bu
-            features[11] = sc
-            features[12] = sod
-            features[13] = pot
-            features[14] = hemo
-            features[15] = pcv
-            features[16] = wc
-            features[17] = rc
-            features[18] = 1 if htn == "Yes" else 0
-            features[19] = 1 if dm == "Yes" else 0
-            features[20] = 1 if cad == "Yes" else 0
-            features[21] = 1 if appet == "Poor" else 0
-            features[22] = 1 if pe == "Yes" else 0
-            features[23] = 1 if ane == "Yes" else 0
-            
-            # 3. Get Prediction
-            res, prob = predict_risk("kidney", features)
-            
-            # 4. Display Result with Float Conversion Fix
-            if res == 1: 
-                result_text = f"CKD Detected (Risk Score: {prob:.2%})"
-                st.error(f"Result: {result_text}")
-                st.progress(float(prob)) 
-            else: 
-                result_text = f"Healthy (Confidence: {1-prob:.2%})"
-                st.success(f"Result: {result_text}")
-                st.progress(float(1 - prob))
-
-            audited_report = None
-            if prob is not None:
-                column_names = ["age", "bp", "sg", "al", "su", "rbc", "pc", "pcc", "ba", "bgr", 
-                                "bu", "sc", "sod", "pot", "hemo", "pcv", "wc", "rc", "htn", 
-                                "dm", "cad", "appet", "pe", "ane"]
-                readable_names = [
-                    "Age", "BP", "Specific Gravity", "Albumin", "Sugar", "RBC", "Pus Cells", "Pus Cell Clumps",
-                    "Bacteria", "Blood Glucose", "Blood Urea", "Serum Creatinine", "Sodium", "Potassium",
-                    "Hemoglobin", "Packed Cell Volume", "WBC", "RCC", "Hypertension", "Diabetes Mellitus",
-                    "Coronary Artery Disease", "Appetite", "Pedal Edema", "Anemia"
-                ]
-                feature_ranges = {readable_names[i]: REFERENCE_RANGES["kidney"][column_names[i]] 
-                                for i in range(len(readable_names))}
-                
-                patient_metrics = {
-                    "age": age,
-                    "bp": bp,
-                    "sg": float(sg),
-                    "al": al,
-                    "su": su,
-                    "rbc_abnormal": 1 if rbc == "Abnormal" else 0,
-                    "pc_abnormal": 1 if pc == "Abnormal" else 0,
-                    "pcc_present": 1 if pcc == "Present" else 0,
-                    "ba_present": 1 if ba == "Present" else 0,
-                    "bgr": bgr,
-                    "bu": bu,
-                    "sc": sc,
-                    "sod": sod,
-                    "pot": pot,
-                    "hemo": hemo,
-                    "pcv": pcv,
-                    "wc": wc,
-                    "rc": rc,
-                    "htn": 1 if htn == "Yes" else 0,
-                    "dm": 1 if dm == "Yes" else 0,
-                    "cad": 1 if cad == "Yes" else 0,
-                    "appet_poor": 1 if appet == "Poor" else 0,
-                    "pe": 1 if pe == "Yes" else 0,
-                    "ane": 1 if ane == "Yes" else 0
-                }
-                audited_report = display_rag_report("kidney", prob, patient_metrics)
-            # SHAP Explanation for Kidney Disease - captures feature impacts for PDF
-            input_df = pd.DataFrame([features], columns=column_names)
-            
-            # Load model for SHAP explanation
-            try:
-                kidney_model = joblib.load(MODEL_PATHS["kidney"]["model"])
-                kidney_scaler = joblib.load(MODEL_PATHS["kidney"]["scaler"])
-                explanation_container = st.empty()
-                shap_result = generate_shap_explanation(kidney_model, input_df, "kidney", scaler=kidney_scaler, output_placeholder=explanation_container)
-                
-                # Textual insights for PDF report based on SHAP results
-                if shap_result and prob is not None:
-                    # 1. Regenerate the PDF using only textual insights
-                    report_bytes = create_report(
-                        patient_name, 
-                        "Kidney Disease", 
-                        result_text, 
-                        f"{prob*100:.2f}",
-                        patient_features=features, 
-                        feature_names=readable_names,
-                        feature_ranges=feature_ranges, 
-                        feature_impacts=shap_result["feature_impacts"],
-                        pos_factors=shap_result["pos_factors"], # Top 3 Drivers
-                        neg_factors=shap_result["neg_factors"],  # Top 3 Protective
-                        audited_report=audited_report
-                    )
-                    st.download_button(
-                        label="📥 Download Clinical Summary Report",
-                        data=report_bytes,
-                        file_name=f"Kidney_Report_{patient_name}.pdf",
-                        mime="application/pdf",
-                        help="Download a detailed PDF report of the analysis, including key risk factors and explanations.",
-                        type="primary"
-                    )
-            except Exception as e:
-                st.warning(f"Could not load model for explanation: {e}")
-
-    # --- HEART DISEASE (22 Features - drop_first=True) ---
-    elif selection == "Heart Disease":
-        st.title("❤ Heart Disease Prediction")
-        patient_name = st.text_input("Patient Name", "Anonymous")
-        with st.container(border=True):
-            st.subheader("🩸 Vital Signs")
-            col1, col2 = st.columns(2)
-            with col1:
-                age = st.number_input("Age", 1, 100, 50)
-                trestbps = st.number_input("Resting BP", 80, 200, 120)
-                chol = st.number_input("Cholesterol", 100, 500, 200)
-                thalach = st.number_input("Max Heart Rate", 60, 220, 150)
-                oldpeak = st.number_input("ST Depression", 0.0, 6.0, 1.0)
-                slope = st.selectbox("ST Slope Type", ["Type 0", "Type 1", "Type 2"])
-                ca = st.selectbox("Number of Major Vessels", ["0", "1", "2", "3", "4"])            
-            with col2:
-                sex = st.selectbox("Sex", ["Female", "Male"])
-                cp = st.selectbox("Chest Pain Type", ["Type 0", "Type 1", "Type 2", "Type 3"])
-                exang = st.selectbox("Exercise Induced Angina", ["No", "Yes"])
-                fbs = st.selectbox("Fasting Blood Sugar > 120", ["No", "Yes"])
-                restecg = st.selectbox("Resting ECG Results", ["Type 0", "Type 1", "Type 2"])
-                thal = st.selectbox("Thalassemia Status", ["Type 0", "Type 1", "Type 2", "Type 3"])
-
-        if st.button("Predict Heart Health"):
-            # Initializing the 22 features required by the model
-            features = [0.0] * 23
-            
-            # The 5 numerical columns (Indices 0-4) - THESE GET SCALED
-            features[0] = age
-            features[1] = trestbps
-            features[2] = chol
-            features[3] = thalach
-            features[4] = oldpeak
-            
-
-            # The categorical dummies (Indices 5-21) - THESE STAY AS 0 or 1
-            features[5] = 1 if sex == "Male" else 0 # sex_1
-            
-            # CP mapping (cp_1, cp_2, cp_3)
-            if "1" in cp: features[6] = 1
-            elif "2" in cp: features[7] = 1
-            elif "3" in cp: features[8] = 1
-            
-            features[9] = 1 if fbs == "Yes" else 0 # fbs_1
-            if "1" in restecg: features[10] = 1
-            elif "2" in restecg: features[11] = 1
-            features[12] = 1 if exang == "Yes" else 0 # exang_1
-            
-            # Slope mapping (slope_1, slope_2)
-            if "1" in slope: features[13] = 1
-            elif "2" in slope: features[14] = 1
-
-            # CA mapping (ca_1, ca_2, ca_3, ca_4)
-            if "1" in ca: features[15] = 1
-            elif "2" in ca: features[16] = 1
-            elif "3" in ca: features[17] = 1
-            elif "4" in ca: features[18] = 1
-
-            # Thal mapping (thal_1, thal_2, thal_3)
-            if "1" in thal: features[19] = 1
-            elif "2" in thal: features[20] = 1
-            elif "3" in thal: features[21] = 1
-
-            cardio_risk = age * (trestbps / 100)  # Simple combined risk feature
-            features[22] = cardio_risk  # custom cardio risk score feature
-
-            # This keeps 'features' raw for the PDF report
-            features_for_model = list(features)
-            # 2. Scale all 6 at once
-            heart_scaler = joblib.load(MODEL_PATHS["heart"]["scaler"])
-            # We need to pick indices [0, 1, 2, 3, 4, 22] 
-            nums_indices = [0, 1, 2, 3, 4, 22]
-            nums_to_scale = np.array([features[i] for i in nums_indices]).reshape(1, -1)
-
-            # Transform using the NEW scaler (that was trained on 6 columns)
-            scaled_nums = heart_scaler.transform(nums_to_scale).flatten()
-
-            # 3. Put them back
-            for i, idx in enumerate(nums_indices):
-                features_for_model[idx] = scaled_nums[i]
-            final_array = np.array(features_for_model).reshape(1, -1)
-            
-            
-            res, prob = predict_risk("heart", final_array)
-            if res is not None:
-                if res == 1: 
-                    result_text = f"Heart Disease Detected (Risk Score: {prob:.2%})"
-                    st.error(f"Result: {result_text}")
-                    st.progress(prob)
-                else: 
-                    result_text = f"Healthy (Confidence: {1-prob:.2%})"
-                    st.success(f"Result: {result_text}")
-                    st.progress(1 - prob)
-
-                patient_metrics = {
-                    "age": age,
-                    "trestbps": trestbps,
-                    "chol": chol,
-                    "thalach": thalach,
-                    "oldpeak": oldpeak,
-                    "sex_male": 1 if sex == "Male" else 0,
-                    "cp_type": cp,
-                    "exang": 1 if exang == "Yes" else 0,
-                    "fbs": 1 if fbs == "Yes" else 0,
-                    "restecg": restecg,
-                    "thal": thal,
-                    "ca": int(ca),
-                    "cardio_risk": features[22]
-                }
-                audited_report = display_rag_report("heart", prob, patient_metrics)
-
-            st.subheader("💡 Cardiac Diagnostic Insights")
-            heart_labels = [
-                    "Age (Scaled)", "Resting BP (Scaled)", "Cholesterol (Scaled)", 
-                    "Max Heart Rate (Scaled)", "ST Depression (Scaled)",
-                    "Sex (Male)",
-                    "Chest Pain Type 1", "Chest Pain Type 2", "Chest Pain Type 3",
-                    "Fasting Blood Sugar > 120",
-                    "Resting ECG 1", "Resting ECG 2",
-                    "Exercise Induced Angina",
-                    "ST Slope 1", "ST Slope 2",
-                    "Major Vessels (1)", "Major Vessels (2)",
-                    "Major Vessels (3)", "Major Vessels (4)",
-                    "Thalassemia (Fixed Defect)",
-                    "Thalassemia (Normal)",
-                    "Thalassemia (Reversible Defect)",
-                    "Cardio Risk Score"
+        audited_report = None
+        if prob is not None:
+            column_names = ["age", "bp", "sg", "al", "su", "rbc", "pc", "pcc", "ba", "bgr", 
+                            "bu", "sc", "sod", "pot", "hemo", "pcv", "wc", "rc", "htn", 
+                            "dm", "cad", "appet", "pe", "ane"]
+            readable_names = [
+                "Age", "BP", "Specific Gravity", "Albumin", "Sugar", "RBC", "Pus Cells", "Pus Cell Clumps",
+                "Bacteria", "Blood Glucose", "Blood Urea", "Serum Creatinine", "Sodium", "Potassium",
+                "Hemoglobin", "Packed Cell Volume", "WBC", "RCC", "Hypertension", "Diabetes Mellitus",
+                "Coronary Artery Disease", "Appetite", "Pedal Edema", "Anemia"
             ]
+            feature_ranges = {readable_names[i]: REFERENCE_RANGES["kidney"][column_names[i]] 
+                            for i in range(len(readable_names))}
             
-            feature_impacts_heart = display_feature_impacts(heart_model, heart_labels, final_array, "Heart Risk Factors")
+            patient_metrics = {
+                "age": age,
+                "bp": bp,
+                "sg": float(sg),
+                "al": al,
+                "su": su,
+                "rbc_abnormal": 1 if rbc == "Abnormal" else 0,
+                "pc_abnormal": 1 if pc == "Abnormal" else 0,
+                "pcc_present": 1 if pcc == "Present" else 0,
+                "ba_present": 1 if ba == "Present" else 0,
+                "bgr": bgr,
+                "bu": bu,
+                "sc": sc,
+                "sod": sod,
+                "pot": pot,
+                "hemo": hemo,
+                "pcv": pcv,
+                "wc": wc,
+                "rc": rc,
+                "htn": 1 if htn == "Yes" else 0,
+                "dm": 1 if dm == "Yes" else 0,
+                "cad": 1 if cad == "Yes" else 0,
+                "appet_poor": 1 if appet == "Poor" else 0,
+                "pe": 1 if pe == "Yes" else 0,
+                "ane": 1 if ane == "Yes" else 0
+            }
+            audited_report = display_rag_report("kidney", prob, patient_metrics)
+        # SHAP Explanation for Kidney Disease - captures feature impacts for PDF
+        input_df = pd.DataFrame([features], columns=column_names)
+        
+        # Load model for SHAP explanation
+        try:
+            kidney_model = joblib.load(MODEL_PATHS["kidney"]["model"])
+            kidney_scaler = joblib.load(MODEL_PATHS["kidney"]["scaler"])
+            explanation_container = st.empty()
+            shap_result = generate_shap_explanation(kidney_model, input_df, "kidney", scaler=kidney_scaler, output_placeholder=explanation_container)
             
-            # Regenerate PDF with feature impacts
-            if prob is not None and feature_impacts_heart:
-                heart_readable_names = [
-                    "Age", "Resting BP", "Cholesterol", "Max Heart Rate", "ST Depression",
-                    "Sex (Male)", "Chest Pain 1", "Chest Pain 2", "Chest Pain 3",
-                    "Fasting Blood Sugar", "Resting ECG 1", "Resting ECG 2", "Exercise Induced Angina",
-                    "ST Slope 1", "ST Slope 2", "Major Vessels 1", "Major Vessels 2",
-                    "Major Vessels 3", "Major Vessels 4", "Thalassemia 1", "Thalassemia 2",
-                    "Thalassemia 3", "Cardio Risk Score"
-                ]
-                feature_ranges_heart = {heart_readable_names[i]: REFERENCE_RANGES["heart"].get(
-                    ["age", "trestbps", "chol", "thalach", "oldpeak", "sex_1", "cp_1", "cp_2", "cp_3",
-                    "fbs_1", "restecg_1", "restecg_2", "exang_1", "slope_1", "slope_2", "ca_1", "ca_2",
-                    "ca_3", "ca_4", "thal_1", "thal_2", "thal_3", "cardio_risk"][i], "N/A") 
-                    for i in range(len(heart_readable_names))}
-                
-                result_text_heart = f"Heart Disease Detected (Risk Score: {prob:.2%})" if res == 1 else f"Healthy (Confidence: {1-prob:.2%})"
-                
+            # Textual insights for PDF report based on SHAP results
+            if shap_result and prob is not None:
+                # 1. Regenerate the PDF using only textual insights
                 report_bytes = create_report(
                     patient_name, 
-                    "Heart Disease", 
-                    result_text_heart, 
+                    "Kidney Disease", 
+                    result_text, 
                     f"{prob*100:.2f}",
                     patient_features=features, 
-                    feature_names=heart_readable_names,
-                    feature_ranges=feature_ranges_heart,
-                    # Standardized inputs
-                    pos_factors=feature_impacts_heart["pos_factors"], 
-                    neg_factors=feature_impacts_heart["neg_factors"],
-                    audited_report=audited_report if 'audited_report' in locals() else None
+                    feature_names=readable_names,
+                    feature_ranges=feature_ranges, 
+                    feature_impacts=shap_result["feature_impacts"],
+                    pos_factors=shap_result["pos_factors"], # Top 3 Drivers
+                    neg_factors=shap_result["neg_factors"],  # Top 3 Protective
+                    audited_report=audited_report
                 )
-                        
                 st.download_button(
                     label="📥 Download Clinical Summary Report",
                     data=report_bytes,
-                    file_name=f"Heart_Report_{patient_name}.pdf",
+                    file_name=f"Kidney_Report_{patient_name}.pdf",
                     mime="application/pdf",
                     help="Download a detailed PDF report of the analysis, including key risk factors and explanations.",
-                    type="primary" 
+                    type="primary"
                 )
-    # --- DIABETES (8 Features) ---
-    elif selection == "Diabetes":
-        st.title("🩸 Diabetes Prediction")
-        patient_name = st.text_input("Patient Name", "Anonymous")
-        inputs = [st.number_input(l, 0.0) for l in ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]]
+        except Exception as e:
+            st.warning(f"Could not load model for explanation: {e}")
+
+# --- HEART DISEASE (22 Features - drop_first=True) ---
+elif selection == "Heart Disease":
+    st.title("Heart Disease Prediction")
+    patient_name = st.text_input("Patient Name", "Anonymous")
+    with st.container(border=True):
+        st.subheader("Comprehensive Patient Data")
+        col1, col2 = st.columns(2)
+        with col1:
+            age = st.number_input("Age", 1, 100, 50)
+            trestbps = st.number_input("Resting BP", 80, 200, 120)
+            chol = st.number_input("Cholesterol", 100, 500, 200)
+            thalach = st.number_input("Max Heart Rate", 60, 220, 150)
+            oldpeak = st.number_input("ST Depression", 0.0, 6.0, 1.0)
+            slope = st.selectbox("ST Slope Type", ["Type 0", "Type 1", "Type 2"])
+            ca = st.selectbox("Number of Major Vessels", ["0", "1", "2", "3", "4"])            
+        with col2:
+            sex = st.selectbox("Sex", ["Female", "Male"])
+            cp = st.selectbox("Chest Pain Type", ["Type 0", "Type 1", "Type 2", "Type 3"])
+            exang = st.selectbox("Exercise Induced Angina", ["No", "Yes"])
+            fbs = st.selectbox("Fasting Blood Sugar > 120", ["No", "Yes"])
+            restecg = st.selectbox("Resting ECG Results", ["Type 0", "Type 1", "Type 2"])
+            thal = st.selectbox("Thalassemia Status", ["Type 0", "Type 1", "Type 2", "Type 3"])
+
+    if st.button("Predict Heart Health"):
+        # Initializing the 22 features required by the model
+        features = [0.0] * 23
         
-        if st.button("Predict Diabetes"):
-            res, prob = predict_risk("diabetes", inputs)
+        # The 5 numerical columns (Indices 0-4) - THESE GET SCALED
+        features[0] = age
+        features[1] = trestbps
+        features[2] = chol
+        features[3] = thalach
+        features[4] = oldpeak
+        
+
+        # The categorical dummies (Indices 5-21) - THESE STAY AS 0 or 1
+        features[5] = 1 if sex == "Male" else 0 # sex_1
+        
+        # CP mapping (cp_1, cp_2, cp_3)
+        if "1" in cp: features[6] = 1
+        elif "2" in cp: features[7] = 1
+        elif "3" in cp: features[8] = 1
+        
+        features[9] = 1 if fbs == "Yes" else 0 # fbs_1
+        if "1" in restecg: features[10] = 1
+        elif "2" in restecg: features[11] = 1
+        features[12] = 1 if exang == "Yes" else 0 # exang_1
+        
+        # Slope mapping (slope_1, slope_2)
+        if "1" in slope: features[13] = 1
+        elif "2" in slope: features[14] = 1
+
+        # CA mapping (ca_1, ca_2, ca_3, ca_4)
+        if "1" in ca: features[15] = 1
+        elif "2" in ca: features[16] = 1
+        elif "3" in ca: features[17] = 1
+        elif "4" in ca: features[18] = 1
+
+        # Thal mapping (thal_1, thal_2, thal_3)
+        if "1" in thal: features[19] = 1
+        elif "2" in thal: features[20] = 1
+        elif "3" in thal: features[21] = 1
+
+        cardio_risk = age * (trestbps / 100)  # Simple combined risk feature
+        features[22] = cardio_risk  # custom cardio risk score feature
+
+        # This keeps 'features' raw for the PDF report
+        features_for_model = list(features)
+        # 2. Scale all 6 at once
+        heart_scaler = joblib.load(MODEL_PATHS["heart"]["scaler"])
+        # We need to pick indices [0, 1, 2, 3, 4, 22] 
+        nums_indices = [0, 1, 2, 3, 4, 22]
+        nums_to_scale = np.array([features[i] for i in nums_indices]).reshape(1, -1)
+
+        # Transform using the NEW scaler (that was trained on 6 columns)
+        scaled_nums = heart_scaler.transform(nums_to_scale).flatten()
+
+        # 3. Put them back
+        for i, idx in enumerate(nums_indices):
+            features_for_model[idx] = scaled_nums[i]
+        final_array = np.array(features_for_model).reshape(1, -1)
+        
+        
+        res, prob = predict_risk("heart", final_array)
+        if res is not None:
             if res == 1: 
-                result_text = f"Diabetes Detected (Risk Score: {prob:.2%})"
-                st.error(f"Result: {result_text}")
-                st.progress(float(prob))
-            else: 
-                result_text = f"Healthy (Confidence: {1-prob:.2%})"
-                st.success(f"Result: {result_text}")
-                st.progress(float(1 - prob))
-            audited_report = None
-            if prob is not None:
-                diabetes_feature_names = ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]
-                feature_ranges_diabetes = {name: REFERENCE_RANGES["diabetes"][name] for name in diabetes_feature_names}
-                patient_metrics = {
-                    "pregnancies": inputs[0],
-                    "glucose": inputs[1],
-                    "bp": inputs[2],
-                    "skinthickness": inputs[3],
-                    "insulin": inputs[4],
-                    "bmi": inputs[5],
-                    "dpf": inputs[6],
-                    "age": inputs[7]
-                }
-                audited_report = display_rag_report("diabetes", prob, patient_metrics)
-            
-            # SHAP Explanation for Diabetes - captures feature impacts for PDF
-            input_df = pd.DataFrame([inputs], columns=diabetes_feature_names)
-            
-            # Load model for SHAP explanation
-            try:
-                diabetes_model = joblib.load(MODEL_PATHS["diabetes"]["model"])
-                diabetes_scaler = joblib.load(MODEL_PATHS["diabetes"]["scaler"])
-                explanation_container = st.empty()
-                shap_result = generate_shap_explanation(diabetes_model, input_df, "diabetes", scaler=diabetes_scaler, output_placeholder=explanation_container)
-                
-                # If we got feature impacts from SHAP, regenerate PDF with them
-                if shap_result and "feature_impacts" in shap_result and prob is not None:
-                    report_bytes = create_report(patient_name, 
-                                                "Diabetes Disease", 
-                                                result_text, 
-                                                f"{prob*100:.2f}",
-                                                patient_features=inputs, 
-                                                feature_names=diabetes_feature_names,
-                                                feature_ranges=feature_ranges_diabetes, 
-                                                feature_impacts=shap_result["feature_impacts"],
-                                                pos_factors=shap_result["pos_factors"], # Top 3 Drivers
-                                                neg_factors=shap_result["neg_factors"],  # Top 3 Protective
-                                                audited_report=audited_report
-                                            )
-                    st.download_button(
-                        label="📥 Download Clinical Summary Report", 
-                        data=report_bytes, 
-                        file_name=f"Diabetes_Report_{patient_name}.pdf", 
-                        mime="application/pdf",
-                        help="Download a detailed PDF report of the analysis, including key risk factors and explanations.",
-                        type="primary"
-                    )
-            except Exception as e:
-                st.warning(f"Could not load model for explanation: {e}")
-
-    # --- STROKE (17 Features) ---
-    elif selection == "Stroke":
-        st.title("🧠 Stroke Risk Prediction")
-        patient_name = st.text_input("Patient Name", "Anonymous")
-        with st.container(border=True):
-            st.subheader("🩸 Vital Signs")
-            col1, col2 = st.columns(2)
-            with col1:
-                age = st.number_input("Age", 1, 100, 50)
-                avg_glucose = st.number_input("Avg Glucose", 50.0, 300.0, 100.0)
-                bmi = st.number_input("BMI", 10.0, 60.0, 25.0)
-                gender = st.selectbox("Gender", ["Female", "Male"])
-                residence = st.selectbox("Residence Type", ["Rural", "Urban"])
-                married = st.selectbox("Ever Married?", ["No", "Yes"])
-            with col2:
-                hyper = st.selectbox("Hypertension", ["No", "Yes"])
-                heart = st.selectbox("Heart Disease", ["No", "Yes"])
-                work = st.selectbox("Work Type", ["Private", "Self-employed", "Govt_job", "children", "Never_worked"])
-                smoke = st.selectbox("Smoking Status", ["formerly smoked", "never smoked", "smokes", "Unknown"])
-
-        if st.button("Predict Stroke Risk"):
-            features = [0.0] * 18
-            
-            # 1. Basic Features
-            features[0] = 1.0 if gender == "Male" else 0.0
-            features[1] = age
-            features[2] = 1.0 if hyper == "Yes" else 0.0
-            features[3] = 1.0 if heart == "Yes" else 0.0
-            features[4] = 1.0 if married == "Yes" else 0.0
-            features[5] = 1.0 if residence == "Urban" else 0.0
-            features[6] = avg_glucose
-            features[7] = bmi
-            
-            # 2. Work Type Mapping (Indices 8-12)
-            work_map = {
-                "Govt_job": 8, 
-                "Never_worked": 9, 
-                "Private": 10, 
-                "Self-employed": 11, 
-                "children": 12
-            }
-            features[work_map[work]] = 1
-            
-            # 3. Smoking Status Mapping (Indices 13-16)
-            smoke_map = {
-                "Unknown": 13, 
-                "formerly smoked": 14, 
-                "never smoked": 15, 
-                "smokes": 16
-            }
-            features[smoke_map[smoke]] = 1
-
-            h_val = 1.0 if hyper == "Yes" else 0.0
-            hd_val = 1.0 if heart == "Yes" else 0.0
-        
-            medical_risk = age * (h_val + hd_val + 1)
-        
-            # Append it to your features list at the end (Index 17)
-            features[17] = medical_risk
-
-            # 2. NOW convert to numpy array so it has the .flatten() method
-            scaler = joblib.load(MODEL_PATHS["stroke"]["scaler"])
-            features_array = np.array(features)
-            features_scaled = scaler.transform(np.array(features).reshape(1, -1))
-
-            res, prob = predict_risk("stroke", features_scaled)
-            
-            # Apply stroke-specific risk threshold from config
-            audited_report = None
-            if prob >= RISK_THRESHOLDS["stroke"]: 
-                result_text = f"High Stroke Risk(Risk Score: {prob:.2%})"
+                result_text = f"Heart Disease Detected (Risk Score: {prob:.2%})"
                 st.error(f"Result: {result_text}")
                 st.progress(prob)
             else: 
-                result_text = f"Low Risk (Confidence: {1-prob:.2%})"
+                result_text = f"Healthy (Confidence: {1-prob:.2%})"
                 st.success(f"Result: {result_text}")
                 st.progress(1 - prob)
-            patient_metrics = {
-                "gender_male": 1.0 if gender == "Male" else 0.0,
-                "age": age,
-                "hypertension": 1.0 if hyper == "Yes" else 0.0,
-                "heart_disease": 1.0 if heart == "Yes" else 0.0,
-                "ever_married": 1.0 if married == "Yes" else 0.0,
-                "residence_urban": 1.0 if residence == "Urban" else 0.0,
-                "avg_glucose": avg_glucose,
-                "bmi": bmi,
-                "work": work,
-                "smoke": smoke,
-                "medical_risk": features[17]
-            }
-            audited_report = display_rag_report("stroke", prob, patient_metrics)
-            
-            st.subheader("💡 Diagnostic Insights")
-            stroke_features = [
-                "Gender_Male", "Age", "Hypertension", "Heart Disease", 
-                "Ever_Married_Yes", "Residence_type_Urban", "Avg Glucose Level", "BMI",
-                "Work_Govt", "Work_Never", "Work_Private", "Work_Self", "Work_children",
-                "Smoke_Unknown", "Smoke_formerly", "Smoke_never", "Smoke_smokes", "Medical_Risk_Factor"
-            ]
-            
-            feature_impacts_stroke = display_feature_impacts(stroke_model, stroke_features, features_scaled, "Stroke Risk Factors")
-            
-            # Regenerate PDF with feature impacts
-            if prob is not None and feature_impacts_stroke:
-                stroke_feature_names = [
-                    "Gender (Male)", "Age", "Hypertension", "Heart Disease",
-                    "Ever Married", "Urban Residence", "Avg Glucose Level", "BMI",
-                    "Work: Govt", "Work: Never", "Work: Private", "Work: Self-employed", "Work: Children",
-                    "Smoke: Unknown", "Smoke: Formerly", "Smoke: Never", "Smoke: Current", "Medical Risk"
-                ]
-                feature_ranges_stroke = {stroke_feature_names[i]: REFERENCE_RANGES["stroke"].get(
-                    ["Gender_Male", "Age", "Hypertension", "Heart Disease", "Ever_Married_Yes", "Residence_type_Urban",
-                    "Avg Glucose Level", "BMI", "Work_Govt", "Work_Never", "Work_Private", "Work_Self", "Work_children",
-                    "Smoke_Unknown", "Smoke_formerly", "Smoke_never", "Smoke_smokes", "Medical_Risk_Factor"][i], "N/A")
-                    for i in range(len(stroke_feature_names))}
-                
-                report_bytes = create_report(
-                    patient_name, 
-                    "Stroke Disease", 
-                    result_text, 
-                    f"{prob*100:.2f}",     
-                    patient_features=features, 
-                    feature_names=stroke_feature_names,
-                    feature_ranges=feature_ranges_stroke, 
-                    pos_factors=feature_impacts_stroke["pos_factors"], 
-                    neg_factors=feature_impacts_stroke["neg_factors"],
-                    audited_report=audited_report if 'audited_report' in locals() else None
-                )
 
+            patient_metrics = {
+                "age": age,
+                "trestbps": trestbps,
+                "chol": chol,
+                "thalach": thalach,
+                "oldpeak": oldpeak,
+                "sex_male": 1 if sex == "Male" else 0,
+                "cp_type": cp,
+                "exang": 1 if exang == "Yes" else 0,
+                "fbs": 1 if fbs == "Yes" else 0,
+                "restecg": restecg,
+                "thal": thal,
+                "ca": int(ca),
+                "cardio_risk": features[22]
+            }
+            audited_report = display_rag_report("heart", prob, patient_metrics)
+
+        st.subheader("💡 Cardiac Diagnostic Insights")
+        heart_labels = [
+                "Age (Scaled)", "Resting BP (Scaled)", "Cholesterol (Scaled)", 
+                "Max Heart Rate (Scaled)", "ST Depression (Scaled)",
+                "Sex (Male)",
+                "Chest Pain Type 1", "Chest Pain Type 2", "Chest Pain Type 3",
+                "Fasting Blood Sugar > 120",
+                "Resting ECG 1", "Resting ECG 2",
+                "Exercise Induced Angina",
+                "ST Slope 1", "ST Slope 2",
+                "Major Vessels (1)", "Major Vessels (2)",
+                "Major Vessels (3)", "Major Vessels (4)",
+                "Thalassemia (Fixed Defect)",
+                "Thalassemia (Normal)",
+                "Thalassemia (Reversible Defect)",
+                "Cardio Risk Score"
+        ]
+        
+        feature_impacts_heart = display_feature_impacts(heart_model, heart_labels, final_array, "Heart Risk Factors")
+        
+        # Regenerate PDF with feature impacts
+        if prob is not None and feature_impacts_heart:
+            heart_readable_names = [
+                "Age", "Resting BP", "Cholesterol", "Max Heart Rate", "ST Depression",
+                "Sex (Male)", "Chest Pain 1", "Chest Pain 2", "Chest Pain 3",
+                "Fasting Blood Sugar", "Resting ECG 1", "Resting ECG 2", "Exercise Induced Angina",
+                "ST Slope 1", "ST Slope 2", "Major Vessels 1", "Major Vessels 2",
+                "Major Vessels 3", "Major Vessels 4", "Thalassemia 1", "Thalassemia 2",
+                "Thalassemia 3", "Cardio Risk Score"
+            ]
+            feature_ranges_heart = {heart_readable_names[i]: REFERENCE_RANGES["heart"].get(
+                ["age", "trestbps", "chol", "thalach", "oldpeak", "sex_1", "cp_1", "cp_2", "cp_3",
+                "fbs_1", "restecg_1", "restecg_2", "exang_1", "slope_1", "slope_2", "ca_1", "ca_2",
+                "ca_3", "ca_4", "thal_1", "thal_2", "thal_3", "cardio_risk"][i], "N/A") 
+                for i in range(len(heart_readable_names))}
+            
+            result_text_heart = f"Heart Disease Detected (Risk Score: {prob:.2%})" if res == 1 else f"Healthy (Confidence: {1-prob:.2%})"
+            
+            report_bytes = create_report(
+                patient_name, 
+                "Heart Disease", 
+                result_text_heart, 
+                f"{prob*100:.2f}",
+                patient_features=features, 
+                feature_names=heart_readable_names,
+                feature_ranges=feature_ranges_heart,
+                # Standardized inputs
+                pos_factors=feature_impacts_heart["pos_factors"], 
+                neg_factors=feature_impacts_heart["neg_factors"],
+                audited_report=audited_report if 'audited_report' in locals() else None
+            )
+                    
+            st.download_button(
+                label="📥 Download Clinical Summary Report",
+                data=report_bytes,
+                file_name=f"Heart_Report_{patient_name}.pdf",
+                mime="application/pdf",
+                help="Download a detailed PDF report of the analysis, including key risk factors and explanations.",
+                type="primary" 
+            )
+
+# --- DIABETES (8 Features) ---
+elif selection == "Diabetes":
+    st.title("Diabetes Prediction")
+    patient_name = st.text_input("Patient Name", "Anonymous")
+    inputs = [st.number_input(l, 0.0) for l in ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]]
+    
+    if st.button("Predict Diabetes"):
+        res, prob = predict_risk("diabetes", inputs)
+        if res == 1: 
+            result_text = f"Diabetes Detected (Risk Score: {prob:.2%})"
+            st.error(f"Result: {result_text}")
+            st.progress(float(prob))
+        else: 
+            result_text = f"Healthy (Confidence: {1-prob:.2%})"
+            st.success(f"Result: {result_text}")
+            st.progress(float(1 - prob))
+        audited_report = None
+        if prob is not None:
+            diabetes_feature_names = ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]
+            feature_ranges_diabetes = {name: REFERENCE_RANGES["diabetes"][name] for name in diabetes_feature_names}
+            patient_metrics = {
+                "pregnancies": inputs[0],
+                "glucose": inputs[1],
+                "bp": inputs[2],
+                "skinthickness": inputs[3],
+                "insulin": inputs[4],
+                "bmi": inputs[5],
+                "dpf": inputs[6],
+                "age": inputs[7]
+            }
+            audited_report = display_rag_report("diabetes", prob, patient_metrics)
+        
+        # SHAP Explanation for Diabetes - captures feature impacts for PDF
+        input_df = pd.DataFrame([inputs], columns=diabetes_feature_names)
+        
+        # Load model for SHAP explanation
+        try:
+            diabetes_model = joblib.load(MODEL_PATHS["diabetes"]["model"])
+            diabetes_scaler = joblib.load(MODEL_PATHS["diabetes"]["scaler"])
+            explanation_container = st.empty()
+            shap_result = generate_shap_explanation(diabetes_model, input_df, "diabetes", scaler=diabetes_scaler, output_placeholder=explanation_container)
+            
+            # If we got feature impacts from SHAP, regenerate PDF with them
+            if shap_result and "feature_impacts" in shap_result and prob is not None:
+                report_bytes = create_report(patient_name, 
+                                            "Diabetes Disease", 
+                                            result_text, 
+                                            f"{prob*100:.2f}",
+                                            patient_features=inputs, 
+                                            feature_names=diabetes_feature_names,
+                                            feature_ranges=feature_ranges_diabetes, 
+                                            feature_impacts=shap_result["feature_impacts"],
+                                            pos_factors=shap_result["pos_factors"], # Top 3 Drivers
+                                            neg_factors=shap_result["neg_factors"],  # Top 3 Protective
+                                            audited_report=audited_report
+                                        )
                 st.download_button(
-                    label="📥 Download Clinical Summary Report",
+                    label="📥 Download Clinical Summary Report", 
                     data=report_bytes, 
-                    file_name=f"stroke_Report{patient_name}.pdf", 
+                    file_name=f"Diabetes_Report_{patient_name}.pdf", 
                     mime="application/pdf",
                     help="Download a detailed PDF report of the analysis, including key risk factors and explanations.",
-                    type="primary" 
+                    type="primary"
                 )
+        except Exception as e:
+            st.warning(f"Could not load model for explanation: {e}")
 
-elif st.session_state.current_view == "Chat":
+# --- STROKE (17 Features) ---
+elif selection == "Stroke":
+    st.title("Stroke Risk Prediction")
+    patient_name = st.text_input("Patient Name", "Anonymous")
+    with st.container(border=True):
+        st.subheader("Comprehensive Patient Data")
+        col1, col2 = st.columns(2)
+        with col1:
+            age = st.number_input("Age", 1, 100, 50)
+            avg_glucose = st.number_input("Avg Glucose", 50.0, 300.0, 100.0)
+            bmi = st.number_input("BMI", 10.0, 60.0, 25.0)
+            gender = st.selectbox("Gender", ["Female", "Male"])
+            residence = st.selectbox("Residence Type", ["Rural", "Urban"])
+            married = st.selectbox("Ever Married?", ["No", "Yes"])
+        with col2:
+            hyper = st.selectbox("Hypertension", ["No", "Yes"])
+            heart = st.selectbox("Heart Disease", ["No", "Yes"])
+            work = st.selectbox("Work Type", ["Private", "Self-employed", "Govt_job", "children", "Never_worked"])
+            smoke = st.selectbox("Smoking Status", ["formerly smoked", "never smoked", "smokes", "Unknown"])
+
+    if st.button("Predict Stroke Risk"):
+        features = [0.0] * 18
+        
+        # 1. Basic Features
+        features[0] = 1.0 if gender == "Male" else 0.0
+        features[1] = age
+        features[2] = 1.0 if hyper == "Yes" else 0.0
+        features[3] = 1.0 if heart == "Yes" else 0.0
+        features[4] = 1.0 if married == "Yes" else 0.0
+        features[5] = 1.0 if residence == "Urban" else 0.0
+        features[6] = avg_glucose
+        features[7] = bmi
+        
+        # 2. Work Type Mapping (Indices 8-12)
+        work_map = {
+            "Govt_job": 8, 
+            "Never_worked": 9, 
+            "Private": 10, 
+            "Self-employed": 11, 
+            "children": 12
+        }
+        features[work_map[work]] = 1
+        
+        # 3. Smoking Status Mapping (Indices 13-16)
+        smoke_map = {
+            "Unknown": 13, 
+            "formerly smoked": 14, 
+            "never smoked": 15, 
+            "smokes": 16
+        }
+        features[smoke_map[smoke]] = 1
+
+        h_val = 1.0 if hyper == "Yes" else 0.0
+        hd_val = 1.0 if heart == "Yes" else 0.0
+    
+        medical_risk = age * (h_val + hd_val + 1)
+    
+        # Append it to your features list at the end (Index 17)
+        features[17] = medical_risk
+
+        # 2. NOW convert to numpy array so it has the .flatten() method
+        scaler = joblib.load(MODEL_PATHS["stroke"]["scaler"])
+        features_array = np.array(features)
+        features_scaled = scaler.transform(np.array(features).reshape(1, -1))
+
+        res, prob = predict_risk("stroke", features_scaled)
+        
+        # Apply stroke-specific risk threshold from config
+        audited_report = None
+        if prob >= RISK_THRESHOLDS["stroke"]: 
+            result_text = f"High Stroke Risk(Risk Score: {prob:.2%})"
+            st.error(f"Result: {result_text}")
+            st.progress(prob)
+        else: 
+            result_text = f"Low Risk (Confidence: {1-prob:.2%})"
+            st.success(f"Result: {result_text}")
+            st.progress(1 - prob)
+        patient_metrics = {
+            "gender_male": 1.0 if gender == "Male" else 0.0,
+            "age": age,
+            "hypertension": 1.0 if hyper == "Yes" else 0.0,
+            "heart_disease": 1.0 if heart == "Yes" else 0.0,
+            "ever_married": 1.0 if married == "Yes" else 0.0,
+            "residence_urban": 1.0 if residence == "Urban" else 0.0,
+            "avg_glucose": avg_glucose,
+            "bmi": bmi,
+            "work": work,
+            "smoke": smoke,
+            "medical_risk": features[17]
+        }
+        audited_report = display_rag_report("stroke", prob, patient_metrics)
+        
+        st.subheader("💡 Diagnostic Insights")
+        stroke_features = [
+            "Gender_Male", "Age", "Hypertension", "Heart Disease", 
+            "Ever_Married_Yes", "Residence_type_Urban", "Avg Glucose Level", "BMI",
+            "Work_Govt", "Work_Never", "Work_Private", "Work_Self", "Work_children",
+            "Smoke_Unknown", "Smoke_formerly", "Smoke_never", "Smoke_smokes", "Medical_Risk_Factor"
+        ]
+        
+        feature_impacts_stroke = display_feature_impacts(stroke_model, stroke_features, features_scaled, "Stroke Risk Factors")
+        
+        # Regenerate PDF with feature impacts
+        if prob is not None and feature_impacts_stroke:
+            stroke_feature_names = [
+                "Gender (Male)", "Age", "Hypertension", "Heart Disease",
+                "Ever Married", "Urban Residence", "Avg Glucose Level", "BMI",
+                "Work: Govt", "Work: Never", "Work: Private", "Work: Self-employed", "Work: Children",
+                "Smoke: Unknown", "Smoke: Formerly", "Smoke: Never", "Smoke: Current", "Medical Risk"
+            ]
+            feature_ranges_stroke = {stroke_feature_names[i]: REFERENCE_RANGES["stroke"].get(
+                ["Gender_Male", "Age", "Hypertension", "Heart Disease", "Ever_Married_Yes", "Residence_type_Urban",
+                "Avg Glucose Level", "BMI", "Work_Govt", "Work_Never", "Work_Private", "Work_Self", "Work_children",
+                "Smoke_Unknown", "Smoke_formerly", "Smoke_never", "Smoke_smokes", "Medical_Risk_Factor"][i], "N/A")
+                for i in range(len(stroke_feature_names))}
+            
+            report_bytes = create_report(
+                patient_name, 
+                "Stroke Disease", 
+                result_text, 
+                f"{prob*100:.2f}",     
+                patient_features=features, 
+                feature_names=stroke_feature_names,
+                feature_ranges=feature_ranges_stroke, 
+                pos_factors=feature_impacts_stroke["pos_factors"], 
+                neg_factors=feature_impacts_stroke["neg_factors"],
+                audited_report=audited_report if 'audited_report' in locals() else None
+            )
+
+            st.download_button(
+                label="📥 Download Clinical Summary Report",
+                data=report_bytes, 
+                file_name=f"stroke_Report{patient_name}.pdf", 
+                mime="application/pdf",
+                help="Download a detailed PDF report of the analysis, including key risk factors and explanations.",
+                type="primary" 
+            )
+
+elif selection == "AI Clinical Assistant":
+    st.title("AI Clinical Assistant")
+    st.write("Chat with the AI assistant about any medical topic, patient case, or general inquiry. The assistant is designed to provide evidence-based information and support clinical decision-making, \n\nPlease upload the PDF Report generated in the Diagnosis workspace and begin your interactive session with the AI Assistant.")
     run_chat_page()
 
-# --- SIDEBAR FOOTER & RED DISCLAIMER ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("### ⚠️ :red[Critical Disclaimer]")
-st.sidebar.markdown("""
-:red[**This tool is for educational and demonstration purposes only.**] 
+elif selection == "Clinical Guidelines":
+    run_guidelines_page()
 
-The predictions generated by these AI models are based on historical data and **must not** be used as a substitute for professional medical advice, diagnosis, or treatment. 
 
-*If you are experiencing a medical emergency, please contact your local healthcare provider immediately.*
-""")
+# --- NATURAL BOTTOM POSITIONING ---
+# Adds a clean divider line right after your model forms, then displays the disclaimer text
+st.divider()
+
+st.markdown(
+    """
+    <div class="clinical-disclaimer-box">
+        <div class="disclaimer-title">⚠️ Critical Clinical Disclaimer</div>
+        <p class="disclaimer-text">
+            The predictions generated by these AI models are based on historical data and must not be used as a substitute for professional medical advice, diagnosis, or treatment.
+            <br><br>
+            If you are experiencing a medical emergency, please contact your local healthcare provider immediately.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
