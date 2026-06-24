@@ -56,9 +56,16 @@ While standard ML models excel at calculating risk percentages from raw clinical
 - **Dynamic Interface Logging:** A Streamlit frontend tracking background execution milestones live using a clean generation expander.
 - **Professional PDF Report Generation:** Instantly exports comprehensive patient records containing vital charts, target values, feature impacts, and the finalized clinical audit statement.
 
-### Phase 2: Conversational Extension (System Roadmap)
+### 💬 Phase 2: Conversational Extension (Fully Functional Deployment)
 
-- **State-Managed Interactive Layer:** A planned multi-turn conversational interface enabling clinicians to query the generated document, strictly bounded by the underlying database knowledge.
+The system features a fully deployed, high-specificity conversational layer built directly into the workspace tabs. This extension shifts the platform from a static evaluation summary tool into an active, multi-turn clinical reasoning partner.
+
+#### Key Functional Capabilities:
+
+- **State-Managed Interactive Layer:** Built on a persistent, multi-turn session tracking lifecycle (`st.session_state`). Clinicians can cross-examine generated reports, probe risk factors, or follow up on specific treatment pathways across multiple messages without losing historical context.
+- **Hallucination-Resistant Bounding:** The underlying chat agent (`MedicalChatEngine`) operates within strict retrieval-augmented constraints. It hooks directly into the localized vector database, ensuring answers are strictly grounded in validated medical standards (e.g., KDIGO, AHA/ASA guidelines) and any attached context documents, heavily mitigating large language model hallucinations.
+- **Dynamic Context Injection:** Leverages a seamlessly integrated file uploader system. Clinicians can drag and drop external patient histories, laboratory spreadsheets, or clinical notes (such as PDFs) directly into the stream, automatically expanding the context window for the active evaluation session.
+- **Tailored CSS UI/UX Architecture:** The interface is wrapped in a custom corporate stylesheet (`style_chat.css`) utilizing precise CSS injection overrides (`!important`). This ensures the theme maintains complete dark-slate continuity (`#030712`, `#0f1626`) across complex, dynamic Streamlit components—such as multi-file dropzone status cards, inner text block markdown strings, contextual boundaries, and independent sidebar layouts (`streamlit_option_menu`).
 
 ---
 
@@ -181,6 +188,7 @@ The easiest way to get started with full IDE integration, debugging, and all dep
    ```
 
 3. **Open in VS Code and reopen in container:**
+
    ```bash
    code .
    ```
