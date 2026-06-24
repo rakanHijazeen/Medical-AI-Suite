@@ -67,6 +67,16 @@ The system features a fully deployed, high-specificity conversational layer buil
 - **Dynamic Context Injection:** Leverages a seamlessly integrated file uploader system. Clinicians can drag and drop external patient histories, laboratory spreadsheets, or clinical notes (such as PDFs) directly into the stream, automatically expanding the context window for the active evaluation session.
 - **Tailored CSS UI/UX Architecture:** The interface is wrapped in a custom corporate stylesheet (`style_chat.css`) utilizing precise CSS injection overrides (`!important`). This ensures the theme maintains complete dark-slate continuity (`#030712`, `#0f1626`) across complex, dynamic Streamlit components—such as multi-file dropzone status cards, inner text block markdown strings, contextual boundaries, and independent sidebar layouts (`streamlit_option_menu`).
 
+### 📋 Clinical Guidelines & Verification Repositories (Evidence Base)
+
+To guarantee full transparency and absolute clinical traceability, the application includes a dedicated **Clinical Guidelines Workspace**. Rather than keeping the underlying medical logic hidden behind the conversational interface, this workspace maps out and displays the authoritative foundations directly to the user.
+
+#### Features & Structure:
+
+- **Authoritative Reference Matrix:** Organizes clinical knowledge bases into responsive, high-contrast visual summary cards grouped by medical discipline (e.g., _KDIGO Guidelines_ for renal filtration thresholds/SGLT2i safety guardrails, and _AHA/ASA Consensus Protocols_ for stroke biomarker tracking).
+- **Direct Proof/Source Linking:** Each guideline element is tightly coupled with its official, peer-reviewed source artifact. Clinicians can instantly launch the external reference URLs to perform a quick manual validation against raw literature definitions.
+- **Biomarker Range Reference Tool:** Serves as a transparent clinical baseline ledger, making it simple to inspect target value metrics and confirm that the automated audit summaries align perfectly with the newest published standard practices.
+
 ---
 
 ## 🧠 Machine Learning & RAG Pipeline
