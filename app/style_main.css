@@ -1,0 +1,261 @@
+/* Global Base Theme Initialization */
+:root {
+  color-scheme: dark !important;
+}
+
+.stApp,
+.stAppHeader,
+div[data-testid="stAppViewContainer"],
+.main,
+section[data-testid="stMain"] {
+  background-color: #0f172a !important;
+  background: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+/* Primary Dashboard Workspace Layout Block */
+.block-container {
+  background-color: #1e293b !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4) !important;
+  border-radius: 16px !important;
+  padding: 2rem !important;
+}
+
+/* =========================================================
+       1. HIGH-CONTRAST BORDERS & DARK INPUT BACKGROUNDS (FIXED)
+       ========================================================= */
+/* Target both standard inputs and textareas */
+div[data-baseweb="base-input"],
+div[data-baseweb="input"] {
+  background-color: #1e293b !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 8px !important;
+}
+
+input,
+textarea {
+  background-color: transparent !important;
+  color: #f8fafc !important;
+}
+
+/* CRITICAL FIX: Target the exact inner container of the st.selectbox dropdowns */
+div[data-testid="stSelectbox"] div[data-baseweb="select"],
+div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 8px !important;
+}
+
+/* Fix text readability inside the selected dropdown option */
+div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
+  color: #f8fafc !important;
+}
+
+/* STYLING FOR THE OPENED DROPDOWN MENU OPTIONS */
+div[data-baseweb="menu"],
+div[data-baseweb="popover"] ul,
+div[role="listbox"] {
+  background-color: #1e293b !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+div[role="option"] {
+  background-color: transparent !important;
+  color: #f8fafc !important;
+}
+
+div[role="option"]:hover {
+  background-color: #0ea5e9 !important;
+  color: #ffffff !important;
+}
+
+/* Fix dropdown select menu arrows visibility against slate background */
+div[data-testid="stSelectbox"] svg {
+  fill: #94a3b8 !important;
+  color: #94a3b8 !important;
+}
+
+/* Interactive state color shifts when targeted */
+div[data-baseweb="input"]:focus-within,
+div[data-baseweb="select"]:focus-within,
+div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within {
+  border-color: #0ea5e9 !important;
+  box-shadow: 0 0 0 1px #0ea5e9 !important;
+}
+
+/* =========================================================
+       2. RE-STYLING AND OUTLINING THE DYNAMIC RESULTS BLOCK
+       ========================================================= */
+div[data-testid="stMetric"],
+.stMetric {
+  background-color: #0f172a !important;
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  border-radius: 12px !important;
+  padding: 16px 20px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+div[data-testid="stMetric"] label,
+div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+  color: #ffffff !important;
+}
+
+/* =========================================================
+       3. RE-STYLING BUTTON CONTROLS & STEP COUNTERS
+       ========================================================= */
+button,
+div[data-testid="stBaseButton-secondary"] button,
+div[data-testid="stBaseButton-primary"] button {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+button:hover {
+  background-color: #1e293b !important;
+  border-color: #0ea5e9 !important;
+  color: #0ea5e9 !important;
+}
+
+/* =========================================================
+       4. NAVIGATION HEADER ROW ALIGNMENT (FIXED)
+       ========================================================= */
+/* Removed destructive `*` selectors that broke the sliders and inputs */
+div[data-testid="stVerticalBlock"] {
+  background-color: transparent !important;
+}
+
+div[data-testid="column"],
+div[data-testid="stColumn"],
+div[data-testid="stHorizontalBlock"],
+div[data-testid="element-container"],
+.element-container {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.block-container > div:nth-child(1) div[data-testid="stHorizontalBlock"] {
+  background-color: #0f172a !important;
+  background: #0f172a !important;
+  border-radius: 12px !important;
+  padding: 10px 16px !important;
+  margin-bottom: 2rem !important;
+  display: flex !important;
+  align-items: center !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"]:nth-child(1) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.brand-logo-text {
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+  color: #ffffff !important;
+  white-space: nowrap !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center;
+}
+
+/* =========================================================
+       5. SIDEBAR & DROPZONE ATTACHMENTS 
+       ========================================================= */
+section[data-testid="stSidebar"] {
+  background-color: #090d16 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+section[data-testid="stSidebar"] * {
+  color: #e2e8f0 !important;
+}
+
+div[data-testid="stFileUploaderDropzone"] {
+  background-color: #0f172a !important;
+  border: 1px dashed rgba(255, 255, 255, 0.3) !important;
+}
+
+/* =========================================================
+       6. CHAT WINDOW WRAPPERS 
+       ========================================================= */
+div[data-testid="stChatInput"] {
+  background-color: #1e293b !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 12px !important;
+}
+
+div[data-testid="stChatInput"] textarea {
+  background-color: transparent !important;
+  color: #ffffff !important;
+}
+
+/* =========================================================
+       7. INLINE CLINICAL DISCLAIMER LAYOUT 
+       ========================================================= */
+.clinical-disclaimer-box {
+  background-color: rgba(239, 68, 68, 0.06) !important;
+  border: 1px solid rgba(239, 68, 68, 0.25) !important;
+  border-radius: 12px !important;
+  padding: 16px 20px !important;
+  margin-top: 2rem !important;
+  margin-bottom: 1rem !important;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+.disclaimer-title {
+  color: #f87171 !important;
+  font-weight: 700 !important;
+  font-size: 1rem !important;
+  margin-bottom: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.disclaimer-text {
+  color: #cbd5e1 !important;
+  font-size: 0.9rem !important;
+  line-height: 1.6 !important;
+  margin: 0 !important;
+}
+
+/* =========================================================
+       8. GENERAL TYPOGRAPHY CONTRAST RECOVERY 
+       ========================================================= */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+[data-testid="stHeader"] {
+  color: #ffffff !important;
+}
+
+.stMarkdown,
+.stMarkdown p,
+.stMarkdown div,
+span,
+label,
+p {
+  color: #e2e8f0 !important;
+}
+::placeholder {
+  color: #64748b !important;
+}

@@ -22,251 +22,16 @@ from app.chat_tab import run_chat_page
 from app.rag.chat_engine import MedicalChatEngine
 from streamlit_option_menu import option_menu
 
+def load_css(css_file_name: str):
+    """Safely finds and injects local CSS files into the Streamlit DOM."""
+    css_path = Path(__file__).parent / css_file_name
+    try:
+        with open(css_path, "r", encoding="utf-8") as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.error(f"Could not find CSS configuration file at: {css_path}")
 
-st.markdown("""
-    <style>
-    /* Global Base Theme Initialization */
-    :root {
-        color-scheme: dark !important;
-    }
-
-    .stApp, .stAppHeader, div[data-testid="stAppViewContainer"], .main, section[data-testid="stMain"] {
-        background-color: #0f172a !important;
-        background: #0f172a !important;
-        color: #f8fafc !important;
-    }
-
-    /* Primary Dashboard Workspace Layout Block */
-    .block-container {
-        background-color: #1e293b !important;
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4) !important;
-        border-radius: 16px !important;
-        padding: 2rem !important;
-    }
-
-    /* =========================================================
-       1. HIGH-CONTRAST BORDERS & DARK INPUT BACKGROUNDS (FIXED)
-       ========================================================= */
-    /* Target both standard inputs and textareas */
-    div[data-baseweb="base-input"],
-    div[data-baseweb="input"] {
-        background-color: #1e293b !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 8px !important;
-    }
-
-    input, textarea {
-        background-color: transparent !important;
-        color: #f8fafc !important;
-    }
-
-    /* CRITICAL FIX: Target the exact inner container of the st.selectbox dropdowns */
-    div[data-testid="stSelectbox"] div[data-baseweb="select"],
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-        background-color: #1e293b !important;
-        color: #f8fafc !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 8px !important;
-    }
-
-    /* Fix text readability inside the selected dropdown option */
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] * {
-        color: #f8fafc !important;
-    }
-
-    /* STYLING FOR THE OPENED DROPDOWN MENU OPTIONS */
-    div[data-baseweb="menu"], 
-    div[data-baseweb="popover"] ul, 
-    div[role="listbox"] {
-        background-color: #1e293b !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    }
-
-    div[role="option"] {
-        background-color: transparent !important;
-        color: #f8fafc !important;
-    }
-
-    div[role="option"]:hover {
-        background-color: #0ea5e9 !important;
-        color: #ffffff !important;
-    }
-
-    /* Fix dropdown select menu arrows visibility against slate background */
-    div[data-testid="stSelectbox"] svg {
-        fill: #94a3b8 !important;
-        color: #94a3b8 !important;
-    }
-
-    /* Interactive state color shifts when targeted */
-    div[data-baseweb="input"]:focus-within, 
-    div[data-baseweb="select"]:focus-within,
-    div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within {
-        border-color: #0ea5e9 !important;
-        box-shadow: 0 0 0 1px #0ea5e9 !important;
-    }
-
-    /* =========================================================
-       2. RE-STYLING AND OUTLINING THE DYNAMIC RESULTS BLOCK
-       ========================================================= */
-    div[data-testid="stMetric"], .stMetric {
-        background-color: #0f172a !important;
-        background: #0f172a !important;
-        border: 1px solid rgba(255, 255, 255, 0.35) !important;
-        border-radius: 12px !important;
-        padding: 16px 20px !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-    }
-
-    div[data-testid="stMetric"] label, 
-    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-        color: #ffffff !important;
-    }
-
-    /* =========================================================
-       3. RE-STYLING BUTTON CONTROLS & STEP COUNTERS
-       ========================================================= */
-    button, 
-    div[data-testid="stBaseButton-secondary"] button,
-    div[data-testid="stBaseButton-primary"] button {
-        background-color: #0f172a !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.45) !important;
-        border-radius: 6px !important;
-        font-weight: 600 !important;
-        transition: all 0.2s ease !important;
-    }
-
-    button:hover {
-        background-color: #1e293b !important;
-        border-color: #0ea5e9 !important;
-        color: #0ea5e9 !important;
-    }
-
-    /* =========================================================
-       4. NAVIGATION HEADER ROW ALIGNMENT (FIXED)
-       ========================================================= */
-    /* Removed destructive `*` selectors that broke the sliders and inputs */
-    div[data-testid="stVerticalBlock"] {
-        background-color: transparent !important;
-    }
-
-    div[data-testid="column"], div[data-testid="stColumn"], div[data-testid="stHorizontalBlock"], div[data-testid="element-container"], .element-container {
-        background-color: transparent !important;
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-    }
-    
-    .block-container > div:nth-child(1) div[data-testid="stHorizontalBlock"] {
-        background-color: #0f172a !important;
-        background: #0f172a !important;
-        border-radius: 12px !important;
-        padding: 10px 16px !important;
-        margin-bottom: 2rem !important;
-        display: flex !important;
-        align-items: center !important;
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
-    }
-
-    div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"]:nth-child(1) {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-
-    .brand-logo-text {
-        font-size: 1.5rem !important;
-        font-weight: 800 !important;
-        letter-spacing: -0.03em !important;
-        color: #ffffff !important;
-        white-space: nowrap !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        display: flex !important;
-        align-items: center;
-    }
-
-    /* =========================================================
-       5. SIDEBAR & DROPZONE ATTACHMENTS 
-       ========================================================= */
-    section[data-testid="stSidebar"] {
-        background-color: #090d16 !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
-    }
-    
-    section[data-testid="stSidebar"] * {
-        color: #e2e8f0 !important;
-    }
-
-    div[data-testid="stFileUploaderDropzone"] {
-        background-color: #0f172a !important;
-        border: 1px dashed rgba(255, 255, 255, 0.3) !important;
-    }
-
-    /* =========================================================
-       6. CHAT WINDOW WRAPPERS 
-       ========================================================= */
-    div[data-testid="stChatInput"] {
-        background-color: #1e293b !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 12px !important;
-    }
-
-    div[data-testid="stChatInput"] textarea {
-        background-color: transparent !important;
-        color: #ffffff !important;
-    }
-
-    /* =========================================================
-       7. INLINE CLINICAL DISCLAIMER LAYOUT 
-       ========================================================= */
-    .clinical-disclaimer-box {
-        background-color: rgba(239, 68, 68, 0.06) !important;
-        border: 1px solid rgba(239, 68, 68, 0.25) !important;
-        border-radius: 12px !important;
-        padding: 16px 20px !important;
-        margin-top: 2rem !important;
-        margin-bottom: 1rem !important;
-        width: 100% !important;
-        box-sizing: border-box;
-    }
-    
-    .disclaimer-title {
-        color: #f87171 !important;
-        font-weight: 700 !important;
-        font-size: 1rem !important;
-        margin-bottom: 6px !important;
-        display: flex !important;
-        align-items: center !important;
-        gap: 8px !important;
-    }
-
-    .disclaimer-text {
-        color: #cbd5e1 !important;
-        font-size: 0.9rem !important;
-        line-height: 1.6 !important;
-        margin: 0 !important;
-    }
-
-    /* =========================================================
-       8. GENERAL TYPOGRAPHY CONTRAST RECOVERY 
-       ========================================================= */
-    h1, h2, h3, h4, h5, h6, [data-testid="stHeader"] {
-        color: #ffffff !important;
-    }
-
-    .stMarkdown, .stMarkdown p, .stMarkdown div, span, label, p {
-        color: #e2e8f0 !important;
-    }
-    ::placeholder {
-        color: #64748b !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
+load_css("style_main.css")
 
 # Load models
 stroke_model = joblib.load(MODEL_PATHS["stroke"]["model"])
@@ -680,18 +445,21 @@ with header_right:
                                 },
                                 "icon": {"color": "#94a3b8", "font-size": "0.9rem"}, 
                                 "nav-link": {
-                                    "font-size": "0.85rem", 
-                                    "text-align": "center", 
-                                    "padding": "0.5rem 0.7rem",
-                                    "margin": "0px 4px", 
-                                    "--hover-color": "#1e293b", 
-                                    "color": "#cbd5e1",
-                                    "border-radius": "6px"
-                                },
-                                "nav-link-selected": {
-                                    "background-color": "#0ea5e9", 
-                                    "color": "#ffffff",
-                                    "font-weight": "600"
+                                "font-size": "0.85rem", 
+                                "text-align": "center", 
+                                "padding": "0.6rem 0.8rem",
+                                "margin": "0px 4px",                     # Creates clear gaps between buttons
+                                "background-color": "#1e293b",           # Gives unselected items a distinct button card
+                                "--hover-color": "#334155",              # Smooth transition hover state
+                                "color": "#94a3b8",                      # Clean, readable muted text
+                                "border-radius": "8px"
+                            },
+                            "nav-link-selected": {
+                                "background-color": "rgba(6, 182, 212, 0.08)", # Subtle teal hue inside the active button
+                                "color": "#f3f3f3",                             # Clinical Teal text color
+                                "font-weight": "600",
+                                "border-bottom": "3px solid #06b6d4",           # Teal line indicator
+                                "border-radius": "8px 8px 0px 0px"              # Flattened bottom edge for the line
                                 },
                             }
                         )
@@ -699,7 +467,77 @@ st.write("---")
 
 if selection == "Overview":
     st.title("Medical AI Diagnostic Suite")
-    st.write("Select a category from the sidebar to begin. These models are optimized for clinical accuracy.")
+    st.markdown(
+        "<p style='font-size: 1.2rem; color: #94a3b8; margin-top: -10px; margin-bottom: 25px;'>"
+        "Advanced predictive risk stratification and intelligent conversational decision support."
+        "</p>", 
+        unsafe_allow_html=True
+    )
+    
+    st.markdown(
+        "Welcome to the central command hub. This clinical platform integrates highly specialized, "
+        "prognostic machine learning pipelines with production-grade Retrieval-Augmented Generation (RAG) "
+        "frameworks to assist medical practitioners with evidence-based diagnostic insights."
+    )
+    
+    st.write("---")
+    
+    # --- SECTION 1: CORE PREDICTIVE PIPELINES (4-COLUMN CARD GRID) ---
+    st.subheader("⚡ Specialized Diagnostic Workspaces")
+    st.markdown("Utilize our validated predictive models to run rapid multi-variant patient risk assessments:")
+    
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        with st.container(border=True):
+            st.markdown("#### Chronic Kidney Disease")
+            st.caption("Analyzes GFR trajectories, albuminuria metrics, and chronic metabolic data to predict advanced renal decline.")
+    with c2:
+        with st.container(border=True):
+            st.markdown("#### Cardiovascular Disease")
+            st.caption("Evaluates structural lipid profiles, ischemic metrics, and vascular stressors to forecast cardiac events.")
+    with c3:
+        with st.container(border=True):
+            st.markdown("#### Diabetes Mellitus")
+            st.caption("Maps dynamic glycemic baselines, metabolic indicators, and lifestyle variables for insulin resistance profiling.")
+    with c4:
+        with st.container(border=True):
+            st.markdown("#### Cerebrovascular Stroke")
+            st.caption("Processes acute cerebrovascular stressors, blood pressure indices, and demographic risks for stroke tracking.")
+            
+    st.write("")
+    
+    # --- SECTION 2: ADVANCED SYSTEM LAYERS (2-COLUMN DEEP ANALYSIS) ---
+    st.subheader("🔮 Contextual Intelligence Engines")
+    col_left, col_right = st.columns(2)
+    
+    with col_left:
+        with st.container(border=True):
+            st.markdown("### 💬 AI Clinical Assistant")
+            st.write(
+                "Engage with our contextual medical LLM optimized with RAG capabilities. "
+                "Upload patient diagnostic reports generated from the workspaces, query complex multi-morbidity cases, "
+                "and quickly synthesize structured consultation summaries."
+            )
+    
+    with col_right:
+        with st.container(border=True):
+            st.markdown("### 📚 Clinical Guidelines Library")
+            st.write(
+                "Cross-reference active diagnostic indicators against gold-standard clinical guidelines "
+                "(such as KDIGO, AHA/ACC, and ADA). Verify care-plan compliance and automatically flag "
+                "potential protocol deviations."
+            )
+            
+    st.write("---")
+    
+    # --- SECTION 3: SYSTEM OPERATING PIPELINE (MODERN METRIC TRACKS) ---
+    st.subheader("🔄 Standard Operating Workflow")
+    w1, w2, w3 = st.columns(3)
+    w1.metric(label="Step 1", value="Profile Metrics", delta="Input Patient Labs")
+    w2.metric(label="Step 2", value="Analyze Trajectory", delta="Review Prediction Outputs")
+    w3.metric(label="Step 3", value="Deploy RAG Chat", delta="Audit Protocol Compliance")
+
+    st.write("")
     
 
 # --- KIDNEY DISEASE (24 Features) ---
@@ -1038,7 +876,24 @@ elif selection == "Heart Disease":
 elif selection == "Diabetes":
     st.title("Diabetes Prediction")
     patient_name = st.text_input("Patient Name", "Anonymous")
-    inputs = [st.number_input(l, 0.0) for l in ["Pregnancies", "Glucose", "BP", "SkinThickness", "Insulin", "BMI", "DPF", "Age"]]
+    with st.container(border=True):
+        st.subheader("Comprehensive Patient Data")
+
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            pregnancies = st.number_input("Pregnancies", min_value=0.0, step=1.0, value=0.0)
+            glucose = st.number_input("Glucose Concentration (mg/dL)", min_value=0.0, value=120.0)
+            bp = st.number_input("Blood Pressure (mm Hg)", min_value=0.0, value=70.0)
+            skin_thickness = st.number_input("Skin Fold Thickness (mm)", min_value=0.0, value=20.0)
+            
+        with col2:
+            insulin = st.number_input("Insulin (mu U/ml)", min_value=0.0, value=80.0)
+            bmi = st.number_input("Body Mass Index (BMI)", min_value=0.0, value=25.4)
+            dpf = st.number_input("Diabetes Pedigree Function", min_value=0.0, value=0.47, format="%.3f")
+            age = st.number_input("Patient Age (Years)", min_value=0.0, step=1.0, value=33.0)
+
+    inputs = [pregnancies, glucose, bp, skin_thickness, insulin, bmi, dpf, age]         
     
     if st.button("Predict Diabetes"):
         res, prob = predict_risk("diabetes", inputs)
